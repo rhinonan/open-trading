@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUp, ArrowDown, TrendingUp } from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 const MOCK_STOCKS = [
   { symbol: "AAPL", name: "苹果", price: 198.52, change: 2.34 },

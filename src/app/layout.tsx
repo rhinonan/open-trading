@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { SidebarProvider } from "@/hooks/use-sidebar";
 import { LayoutShell } from "@/components/layout/layout-shell";
 import "./globals.css";
+
+const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Open Trading — 智能股票分析系统",
@@ -17,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className="min-h-screen bg-background antialiased">
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background antialiased font-sans`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
