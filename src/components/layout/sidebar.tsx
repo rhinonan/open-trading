@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useMobile } from "@/hooks/use-mobile";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { ThemeToggle } from "./theme-toggle";
+
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -108,14 +108,12 @@ export function Sidebar() {
       </ScrollArea>
 
       {/* Bottom actions */}
-      <div className="border-t border-sidebar-border p-3 flex items-center gap-2">
-        {!collapsed && <ThemeToggle />}
+      <div className="border-t border-sidebar-border p-3 flex items-center justify-center">
         <Button
           variant="ghost"
           size="icon"
           className={cn(
-            "h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground",
-            collapsed && "mx-auto"
+            "h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground"
           )}
           onClick={toggle}
         >

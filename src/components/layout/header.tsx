@@ -50,8 +50,8 @@ export function Header() {
         ))}
       </nav>
 
-      {/* Right side: theme toggle (mobile fallback) */}
-      <div className="md:hidden">
+      {/* Right side: theme toggle (all viewports) */}
+      <div className="flex items-center gap-2">
         <ThemeToggle />
       </div>
     </header>
