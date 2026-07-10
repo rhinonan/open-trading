@@ -9,13 +9,13 @@ export default function GlobalLoading() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-[104px] rounded-xl" />
+          <Skeleton key={i} className="h-[104px] rounded-lg" />
         ))}
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Skeleton className="h-[280px] rounded-xl" />
-        <Skeleton className="h-[280px] rounded-xl" />
-        <Skeleton className="h-[280px] rounded-xl" />
+        <Skeleton className="h-[280px] rounded-lg" />
+        <Skeleton className="h-[280px] rounded-lg" />
+        <Skeleton className="h-[280px] rounded-lg" />
       </div>
     </div>
   );
