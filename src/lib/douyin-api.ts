@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 
-const TIKHUB_BASE = "https://api.tikhub.io";
+const TIKHUB_BASE = process.env.TIKHUB_BASE || "https://api.tikhub.io";
 const TIKHUB_API_KEY = process.env.TIKHUB_API_KEY || "";
 const CACHE_DIR = path.join(process.cwd(), "data", "api-cache");
 const CACHE_MODE = process.env.DOUYIN_CACHE_MODE === "true";
@@ -116,11 +116,7 @@ export async function fetchUserPosts(
 ): Promise<DouyinVideoData[]> {
   try {
     const json = await tikHubFetch<any>(
-      "/api/v1/douyin/app/v3/fetch_user_post",
-      {
-        method: "POST",
-        body: JSON.stringify({ sec_uid: secUid, cursor: "0", count }),
-      }
+      `/api/v1/douyin/app/v3/fetch_user_post_videos?sec_user_id=${encodeURIComponent(secUid)}&max_cursor=0&count=${count}`
     );
     return json.data?.aweme_list ?? [];
   } catch {
@@ -158,7 +154,7 @@ export async function fetchUserProfile(
 } | null> {
   try {
     const json = await tikHubFetch<any>(
-      `/api/v1/douyin/app/v3/fetch_user_profile?sec_uid=${secUid}`
+      `/api/v1/douyin/app/v3/handler_user_profile?sec_user_id=${encodeURIComponent(secUid)}`
     );
     return json.data?.user ?? null;
   } catch {

@@ -61,9 +61,14 @@ export async function addBlogger(douyinUid: string): Promise<DouyinBlogger> {
     throw new Error(`无法获取博主 ${douyinUid} 的信息，请检查 ID 是否正确`);
   }
 
+  // url_list 中前几个通常是 .heic（浏览器不支持），优先取 jpeg/png/webp
+  const pickAvatarUrl = (urls?: string[]): string => {
+    if (!urls?.length) return "";
+    return urls.find((u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u)) || urls[0];
+  };
   const avatar =
-    profile.avatar_medium?.url_list?.[0] ||
-    profile.avatar_thumb?.url_list?.[0] ||
+    pickAvatarUrl(profile.avatar_medium?.url_list) ||
+    pickAvatarUrl(profile.avatar_thumb?.url_list) ||
     "";
 
   const blogger = db

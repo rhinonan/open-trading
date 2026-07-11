@@ -43,4 +43,5 @@ next-env.d.ts
 
 # database
 /data/*.db
+/data/*.db-*
 /data/api-cache/
