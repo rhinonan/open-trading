@@ -2,27 +2,25 @@
 import { db } from "@/db";
 import { bloggers, works } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { fetchDouyinUserPosts } from "@/lib/douyin-api";
-import { transcribeBatch } from "./transcriber";
+import { fetchUserPosts } from "@/lib/douyin-api";
 import type { DouyinBlogger } from "@/types";
 
 export interface ScanResult {
   bloggerId: number;
   nickname: string;
   newWorks: number;
-  transcribedWorks: number;
   errors: string[];
 }
 
 export async function scanAllBloggers(): Promise<ScanResult[]> {
-  const predictorBloggers = db
+  // 扫描所有博主，不区分 category（pending 和 predictor 都扫）
+  const allBloggers = db
     .select()
     .from(bloggers)
-    .where(eq(bloggers.category, "predictor"))
     .all() as DouyinBlogger[];
 
   const results: ScanResult[] = [];
-  for (const blogger of predictorBloggers) {
+  for (const blogger of allBloggers) {
     results.push(await scanBlogger(blogger));
   }
 
@@ -36,12 +34,11 @@ export async function scanBlogger(
     bloggerId: blogger.id,
     nickname: blogger.nickname,
     newWorks: 0,
-    transcribedWorks: 0,
     errors: [],
   };
 
   try {
-    const posts = await fetchDouyinUserPosts(blogger.douyinUid, 10);
+    const posts = await fetchUserPosts(blogger.douyinUid, 10);
     if (posts.length === 0) return result;
 
     // Find new works not yet in DB
@@ -60,9 +57,7 @@ export async function scanBlogger(
     if (newPosts.length === 0) return result;
     result.newWorks = newPosts.length;
 
-    // Insert new works
-    const videosToTranscribe: Array<{ awemeId: string; videoUrl: string }> =
-      [];
+    // Insert new works (raw data only, no downstream processing)
     for (const post of newPosts) {
       db.insert(works)
         .values({
@@ -74,37 +69,17 @@ export async function scanBlogger(
           shareUrl: post.share_url || "",
           statistics: JSON.stringify(post.statistics || {}),
           publishedAt: post.create_time,
-          transcriptStatus: "pending",
+          transcriptStatus: "pending", // 等 ASR 就绪后再处理
         })
         .run();
-
-      const videoUrl =
-        post.video?.download_addr?.url_list?.[0] ||
-        post.video?.play_addr?.url_list?.[0] ||
-        "";
-      if (videoUrl) {
-        videosToTranscribe.push({ awemeId: post.aweme_id, videoUrl });
-      }
     }
 
-    // Transcribe
-    if (videosToTranscribe.length > 0) {
-      const transcripts = await transcribeBatch(videosToTranscribe);
-      for (const [awemeId, text] of transcripts) {
-        if (text) {
-          db.update(works)
-            .set({ transcript: text, transcriptStatus: "done" })
-            .where(eq(works.awemeId, awemeId))
-            .run();
-          result.transcribedWorks++;
-        } else {
-          db.update(works)
-            .set({ transcriptStatus: "failed" })
-            .where(eq(works.awemeId, awemeId))
-            .run();
-        }
-      }
-    }
+    // =====================================================================
+    // TODO: 下游处理 pipeline（逐个实现）：
+    //   1. 下载视频文件 (download_addr.url_list[0])
+    //   2. ffmpeg 提取音轨
+    //   3. 云端 ASR 转文本 → 更新 works.transcript / transcriptStatus
+    // =====================================================================
   } catch (err) {
     result.errors.push(
       err instanceof Error ? err.message : "Unknown error"

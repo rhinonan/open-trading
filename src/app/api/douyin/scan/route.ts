@@ -5,14 +5,9 @@ export async function POST() {
   try {
     const results = await scanAllBloggers();
     const totalNew = results.reduce((sum, r) => sum + r.newWorks, 0);
-    const totalTranscribed = results.reduce(
-      (sum, r) => sum + r.transcribedWorks,
-      0
-    );
     return Response.json({
       total: results.length,
       totalNewWorks: totalNew,
-      totalTranscribedWorks: totalTranscribed,
       results,
     });
   } catch (err) {

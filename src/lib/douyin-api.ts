@@ -1,5 +1,25 @@
 // src/lib/douyin-api.ts
 
+const TIKHUB_BASE = "https://api.tikhub.io";
+const TIKHUB_API_KEY = process.env.TIKHUB_API_KEY || "";
+
+async function tikHubFetch<T>(
+  endpoint: string,
+  options?: RequestInit
+): Promise<T> {
+  const url = `${TIKHUB_BASE}${endpoint}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...options?.headers,
+      "Authorization": `Bearer ${TIKHUB_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`TikHub API error: ${res.status} ${res.statusText}`);
+  return res.json() as Promise<T>;
+}
+
 export interface DouyinVideoData {
   aweme_id: string;
   desc: string;
@@ -41,36 +61,58 @@ export interface DouyinVideoData {
   }>;
 }
 
-export interface DouyinApiResponse {
-  code: number;
-  data: {
-    status_code: number;
-    aweme_detail: DouyinVideoData;
-  };
+export async function fetchUserPosts(
+  secUid: string,
+  count = 10
+): Promise<DouyinVideoData[]> {
+  try {
+    const json = await tikHubFetch<any>(
+      "/api/v1/douyin/app/v3/fetch_user_post",
+      {
+        method: "POST",
+        body: JSON.stringify({ sec_uid: secUid, cursor: "0", count }),
+      }
+    );
+    return json.data?.aweme_list ?? [];
+  } catch {
+    return [];
+  }
 }
 
-const DOUYIN_API_BASE =
-  process.env.DOUYIN_API_BASE || "http://localhost:8000/api/douyin";
-
-export async function fetchDouyinVideo(
+export async function fetchOneVideo(
   awemeId: string
 ): Promise<DouyinVideoData | null> {
-  const url = `${DOUYIN_API_BASE}/web/fetch_one_video?aweme_id=${awemeId}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const json: DouyinApiResponse = await res.json();
-  if (json.code !== 200 || json.data.status_code !== 0) return null;
-  return json.data.aweme_detail;
+  try {
+    const json = await tikHubFetch<any>(
+      `/api/v1/douyin/app/v3/fetch_one_video?aweme_id=${awemeId}`
+    );
+    return json.data?.aweme_detail ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export async function fetchDouyinUserPosts(
-  secUid: string,
-  maxCount = 20
-): Promise<DouyinVideoData[]> {
-  const url = `${DOUYIN_API_BASE}/web/fetch_user_post?sec_uid=${secUid}&max_cursor=0&count=${maxCount}`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const json = await res.json();
-  if (json.code !== 200 || !json.data?.aweme_list) return [];
-  return json.data.aweme_list as DouyinVideoData[];
+export async function fetchUserProfile(
+  secUid: string
+): Promise<{
+  nickname: string;
+  unique_id: string;
+  uid: string;
+  sec_uid: string;
+  signature: string;
+  avatar_thumb: { url_list: string[] };
+  avatar_medium: { url_list: string[] };
+  avatar_larger: { url_list: string[] };
+  follower_count: number;
+  total_favorited: number;
+  aweme_count: number;
+} | null> {
+  try {
+    const json = await tikHubFetch<any>(
+      `/api/v1/douyin/app/v3/fetch_user_profile?sec_uid=${secUid}`
+    );
+    return json.data?.user ?? null;
+  } catch {
+    return null;
+  }
 }
