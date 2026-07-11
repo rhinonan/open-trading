@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Radio } from "lucide-react";
 
 export default function SentimentPage() {
   return (
@@ -10,10 +11,31 @@ export default function SentimentPage() {
           社交媒体情绪监测与热点话题追踪
         </p>
       </div>
+
+      {/* Sub-nav tabs */}
+      <div className="flex gap-2 border-b pb-2">
+        <Link
+          href="/sentiment"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md bg-accent text-accent-foreground"
+        >
+          <MessageCircle className="h-4 w-4" />
+          舆情概览
+        </Link>
+        <Link
+          href="/sentiment/douyin"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <Radio className="h-4 w-4" />
+          抖音监控
+        </Link>
+      </div>
+
       <Card className="flex items-center justify-center min-h-[400px] border-dashed">
         <CardContent className="text-center py-12">
           <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground/40" />
-          <p className="mt-4 text-lg text-muted-foreground">舆情分析功能即将上线</p>
+          <p className="mt-4 text-lg text-muted-foreground">
+            舆情分析功能即将上线
+          </p>
           <p className="mt-1 text-sm text-muted-foreground/60">
             此页面将展示舆情时间线、情绪仪表盘与来源分布
           </p>
