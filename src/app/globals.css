@@ -83,7 +83,8 @@
   --sidebar-ring: oklch(0.708 0 0);
   /* NEW: tech accent */
   --accent-tech: oklch(0.62 0.18 200); /* cyan accent for tech feel */
-  --card-glow: none;
+  --card-glow: 0 1px 3px 0 oklch(0 0 0 / 8%); /* subtle elevation in light mode */
+  --card-ring: oklch(0.88 0 0); /* visible card border in light mode */
 }
 
 .dark {
@@ -120,7 +121,8 @@
   --sidebar-ring: oklch(0.556 0 0);
   /* NEW: tech glow for dark mode */
   --accent-tech: oklch(0.7 0.18 200);
-  --card-glow: 0 0 1px 0 oklch(0.7 0.18 200 / 15%);
+  --card-glow: 0 0 14px 0 oklch(0.7 0.18 200 / 22%); /* stronger glow */
+  --card-ring: oklch(1 0 0 / 15%); /* visible card ring in dark mode */
 }
 
 @layer base {
