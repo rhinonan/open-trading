@@ -1,12 +1,55 @@
 // src/lib/douyin-api.ts
+import * as fs from "fs";
+import * as path from "path";
+import * as crypto from "crypto";
 
 const TIKHUB_BASE = "https://api.tikhub.io";
 const TIKHUB_API_KEY = process.env.TIKHUB_API_KEY || "";
+const CACHE_DIR = path.join(process.cwd(), "data", "api-cache");
+const CACHE_MODE = process.env.DOUYIN_CACHE_MODE === "true";
+
+function cacheKey(endpoint: string, options?: RequestInit): string {
+  const raw = endpoint + (options?.body ? "_" + String(options.body) : "");
+  const hash = crypto.createHash("md5").update(raw).digest("hex").slice(0, 12);
+  // Sanitize endpoint into a readable filename prefix
+  const prefix = endpoint
+    .replace(/^\/api\/v1\/douyin\/app\/v3\//, "")
+    .replace(/[?&]/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 60);
+  return `${prefix}_${hash}.json`;
+}
+
+function readCache(filename: string): string | null {
+  if (!CACHE_MODE) return null;
+  const filepath = path.join(CACHE_DIR, filename);
+  try {
+    return fs.readFileSync(filepath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(filename: string, raw: string): void {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+  fs.writeFileSync(path.join(CACHE_DIR, filename), raw, "utf-8");
+}
 
 async function tikHubFetch<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
+  const filename = cacheKey(endpoint, options);
+
+  // 优先读缓存
+  const cached = readCache(filename);
+  if (cached !== null) {
+    return JSON.parse(cached) as T;
+  }
+
+  // 调 API
   const url = `${TIKHUB_BASE}${endpoint}`;
   const res = await fetch(url, {
     ...options,
@@ -17,7 +60,13 @@ async function tikHubFetch<T>(
     },
   });
   if (!res.ok) throw new Error(`TikHub API error: ${res.status} ${res.statusText}`);
-  return res.json() as Promise<T>;
+
+  const raw = await res.text();
+
+  // 原始响应落盘
+  writeCache(filename, raw);
+
+  return JSON.parse(raw) as T;
 }
 
 export interface DouyinVideoData {
