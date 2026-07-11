@@ -81,6 +81,9 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* NEW: tech accent */
+  --accent-tech: oklch(0.62 0.18 200); /* cyan accent for tech feel */
+  --card-glow: none;
 }
 
 .dark {
@@ -115,6 +118,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* NEW: tech glow for dark mode */
+  --accent-tech: oklch(0.7 0.18 200);
+  --card-glow: 0 0 1px 0 oklch(0.7 0.18 200 / 15%);
 }
 
 @layer base {

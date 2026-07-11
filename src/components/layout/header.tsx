@@ -33,7 +33,7 @@ export function Header() {
   const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:bg-gradient-to-r after:from-transparent after:via-[var(--accent-tech)]/30 after:to-transparent">
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
         {breadcrumbs.map((crumb, i) => (
