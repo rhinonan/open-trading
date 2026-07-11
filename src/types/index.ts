@@ -110,3 +110,85 @@ export interface DashboardStats {
   topLoser: Stock;
   sentimentScore: number;
 }
+
+// ==================== 抖音博主监控 ====================
+
+export type BloggerCategory = "pending" | "predictor" | "non_predictor";
+export type TranscriptStatus = "pending" | "processing" | "done" | "failed";
+export type PredictionType =
+  | "market_direction"
+  | "index_level"
+  | "sector"
+  | "stock_pick";
+
+export interface DouyinBlogger {
+  id: number;
+  douyinUid: string;
+  nickname: string;
+  avatarUrl: string;
+  signature: string;
+  followerCount: number;
+  category: BloggerCategory;
+  classifiedAt: number | null;
+  classificationNote: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DouyinWork {
+  id: number;
+  awemeId: string;
+  bloggerId: number;
+  desc: string;
+  transcript: string | null;
+  transcriptStatus: TranscriptStatus;
+  duration: number;
+  coverUrl: string;
+  shareUrl: string;
+  statistics: string;
+  publishedAt: number;
+  scannedAt: number;
+}
+
+export interface DouyinEvaluation {
+  id: number;
+  bloggerId: number;
+  evalDate: string;
+  worksCount: number;
+  predictionSummary: string;
+  accuracyScore: number;
+  evalDetail: string;
+  marketSnapshot: string;
+  createdAt: number;
+}
+
+export interface PredictionItem {
+  id: number;
+  evaluationId: number;
+  workId: number;
+  predictedContent: string;
+  predictionType: PredictionType;
+  predictionTarget: string;
+  predictionDetail: string;
+  isCorrect: number | null;
+  judgment: string;
+  relatedSymbols: string;
+}
+
+export interface PredictionMix {
+  marketDirection: number;
+  indexLevel: number;
+  sector: number;
+  stockPick: number;
+}
+
+export interface MarketSnapshot {
+  date: string;
+  indices: {
+    shanghai: { close: number; change: number; changePercent: number };
+    shenzhen: { close: number; change: number; changePercent: number };
+    chinext: { close: number; change: number; changePercent: number };
+  };
+  topSectors: Array<{ name: string; changePercent: number }>;
+  bottomSectors: Array<{ name: string; changePercent: number }>;
+}
