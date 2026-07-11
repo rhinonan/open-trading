@@ -61,6 +61,60 @@ export const sentimentAPI = {
     }),
 };
 
+// ==================== Douyin Monitor API ====================
+
+export const douyinAPI = {
+  bloggers: {
+    list: (category?: string) =>
+      fetchAPI<import("@/types").DouyinBlogger[]>("/douyin/bloggers", {
+        params: category ? { category } : undefined,
+      }),
+
+    get: (id: number) =>
+      fetchAPI<import("@/types").DouyinBlogger>(`/douyin/bloggers/${id}`),
+
+    create: (douyinUid: string) =>
+      fetchAPI<import("@/types").DouyinBlogger>("/douyin/bloggers", {
+        method: "POST",
+        body: JSON.stringify({ douyinUid }),
+      }),
+
+    delete: (id: number) =>
+      fetchAPI<{ success: boolean }>(`/douyin/bloggers/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  scan: () =>
+    fetchAPI<{
+      total: number;
+      totalNewWorks: number;
+      results: unknown[];
+    }>("/douyin/scan", { method: "POST" }),
+
+  evaluate: (evalDate?: string) =>
+    fetchAPI<{
+      date: string;
+      totalBloggers: number;
+      totalPredictions: number;
+      results: unknown[];
+    }>("/douyin/evaluate", {
+      method: "POST",
+      body: evalDate ? JSON.stringify({ evalDate }) : undefined,
+    }),
+
+  records: (params?: {
+    bloggerId?: number;
+    evalDate?: string;
+    type?: string;
+  }) =>
+    fetchAPI<
+      Array<import("@/types").DouyinEvaluation & {
+        items: import("@/types").PredictionItem[];
+      }>
+    >("/douyin/records", { params }),
+};
+
 // ==================== Financials API ====================
 
 export const financialsAPI = {
