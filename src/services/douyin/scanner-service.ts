@@ -64,6 +64,7 @@ export async function scanBlogger(
           awemeId: post.aweme_id,
           bloggerId: blogger.id,
           desc: post.desc || "",
+          videoUrl: post.video?.download_addr?.url_list?.[0] || null,
           duration: post.video?.duration || 0,
           coverUrl: post.video?.cover?.url_list?.[0] || "",
           shareUrl: post.share_url || "",
