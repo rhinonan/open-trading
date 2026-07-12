@@ -94,7 +94,9 @@ async function processOneWork(row: WorkRow): Promise<TaskResult> {
     const audioPath = await extractAudio(videoPath, awemeId);
 
     // 5. ASR 转写
-    const transcript = await transcribeAudio(audioPath, duration);
+    // duration=0 means unknown — default to LFASR (long audio) to be safe
+    const effectiveDuration = duration > 0 ? duration : 61_000;
+    const transcript = await transcribeAudio(audioPath, effectiveDuration);
 
     // 6. 回写 DB
     db.update(works)
@@ -110,10 +112,14 @@ async function processOneWork(row: WorkRow): Promise<TaskResult> {
     // 失败回写
     const errorMsg =
       err instanceof Error ? err.message : String(err);
-    db.update(works)
-      .set({ transcriptStatus: "failed" })
-      .where(eq(works.id, id))
-      .run();
+    try {
+      db.update(works)
+        .set({ transcriptStatus: "failed" })
+        .where(eq(works.id, id))
+        .run();
+    } catch (dbErr) {
+      console.error(`Failed to update status for work ${awemeId}:`, dbErr);
+    }
 
     return { awemeId, status: "failed", error: errorMsg };
   }
@@ -139,7 +145,7 @@ export async function transcribePendingWorks(
     })
     .from(works)
     .where(
-      inArray(works.transcriptStatus, ["pending", "failed"])
+      inArray(works.transcriptStatus, ["pending", "processing"])
     )
     .orderBy(asc(works.scannedAt))
     .limit(maxTasks)
