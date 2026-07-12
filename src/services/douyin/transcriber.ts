@@ -217,6 +217,7 @@ async function transcribeLong(audioPath: string): Promise<string> {
   // Step 2: 轮询结果（间隔 10s，最多等 5 分钟）
   const resultUrl = `https://${host}/v2/api/result`;
   const maxAttempts = 30;
+  let consecutiveFailures = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await sleep(10_000);
@@ -236,10 +237,28 @@ async function transcribeLong(audioPath: string): Promise<string> {
       }
     );
 
-    if (!resultRes.ok) continue;
+    if (!resultRes.ok) {
+      consecutiveFailures++;
+      if (consecutiveFailures >= 3) {
+        throw new Error(
+          `LFASR poll failed after ${consecutiveFailures} consecutive errors: HTTP ${resultRes.status}`
+        );
+      }
+      continue;
+    }
 
     const resultJson = await resultRes.json();
-    if (resultJson.code !== 0) continue;
+    if (resultJson.code !== 0) {
+      consecutiveFailures++;
+      if (consecutiveFailures >= 3) {
+        throw new Error(
+          `LFASR poll failed after ${consecutiveFailures} consecutive errors: code=${resultJson.code}`
+        );
+      }
+      continue;
+    }
+
+    consecutiveFailures = 0;
 
     // status: 1=处理中, 2=完成, 3=失败
     if (resultJson.data?.status === 2) {
