@@ -90,8 +90,8 @@ export async function extractAudio(
     fs.writeFileSync(outputPath, Buffer.from(audioData));
   } finally {
     // Cleanup virtual FS even on error
-    await ffmpeg.deleteFile(inputName);
-    await ffmpeg.deleteFile(outputName);
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
   }
 
   return outputPath;

@@ -4,9 +4,8 @@ import * as fs from "fs";
 import * as path from "path";
 
 const DATA_DIR = path.join(__dirname, "..", "data");
-const RETENTION_MS =
-  (parseInt(process.env.VIDEO_RETENTION_DAYS || "7", 10) || 7) *
-  24 * 60 * 60 * 1000;
+const retentionDays = parseInt(process.env.VIDEO_RETENTION_DAYS || "7", 10);
+const RETENTION_MS = (isNaN(retentionDays) ? 7 : retentionDays) * 24 * 60 * 60 * 1000;
 
 const dirsToCheck = ["videos", "audio"];
 
