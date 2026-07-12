@@ -63,32 +63,36 @@ export async function extractAudio(
   // Read video file into memory
   const videoData = fs.readFileSync(videoPath);
 
-  // Write to ffmpeg virtual FS
-  await ffmpeg.writeFile("input.mp4", videoData);
+  // Write to ffmpeg virtual FS — use awemeId to avoid races on shared FS
+  const inputName = `${awemeId}_input.mp4`;
+  const outputName = `${awemeId}_output.wav`;
+  await ffmpeg.writeFile(inputName, videoData);
 
-  // Extract: -vn strips video stream, PCM 16KHz 16bit mono
-  await ffmpeg.exec([
-    "-i",
-    "input.mp4",
-    "-vn",
-    "-acodec",
-    "pcm_s16le",
-    "-ar",
-    "16000",
-    "-ac",
-    "1",
-    "output.wav",
-  ]);
+  try {
+    // Extract: -vn strips video stream, PCM 16KHz 16bit mono
+    await ffmpeg.exec([
+      "-i",
+      inputName,
+      "-vn",
+      "-acodec",
+      "pcm_s16le",
+      "-ar",
+      "16000",
+      "-ac",
+      "1",
+      outputName,
+    ]);
 
-  // Read result from virtual FS
-  const audioData = (await ffmpeg.readFile("output.wav")) as Uint8Array;
+    // Read result from virtual FS
+    const audioData = (await ffmpeg.readFile(outputName)) as Uint8Array;
 
-  // Write to disk
-  fs.writeFileSync(outputPath, Buffer.from(audioData));
-
-  // Cleanup virtual FS
-  await ffmpeg.deleteFile("input.mp4");
-  await ffmpeg.deleteFile("output.wav");
+    // Write to disk
+    fs.writeFileSync(outputPath, Buffer.from(audioData));
+  } finally {
+    // Cleanup virtual FS even on error
+    await ffmpeg.deleteFile(inputName);
+    await ffmpeg.deleteFile(outputName);
+  }
 
   return outputPath;
 }
