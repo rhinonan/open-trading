@@ -74,6 +74,12 @@ export interface DouyinVideoData {
   desc: string;
   create_time: number;
   aweme_type: number;
+  media_type: number; // 2=图集, 4=视频
+  images?: Array<{
+    url_list: string[];
+    width: number;
+    height: number;
+  }>;
   author: {
     nickname: string;
     unique_id: string;

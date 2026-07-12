@@ -59,18 +59,42 @@ export async function scanBlogger(
 
     // Insert new works (raw data only, no downstream processing)
     for (const post of newPosts) {
+      const isImage = post.media_type === 2;
+      const isVideo = post.media_type === 4;
+
+      // 从 url_list 中挑浏览器兼容格式：jpeg > webp > png > 第一项
+      const pickCover = (urlList: string[]) =>
+        urlList.find((u) => u.includes(".jpeg") || u.includes(".jpg")) ||
+        urlList.find((u) => u.includes(".webp")) ||
+        urlList.find((u) => u.includes(".png")) ||
+        urlList[0] ||
+        "";
+
+      let coverUrl = "";
+      if (isVideo) {
+        const originCover = (post.video as any)?.origin_cover?.url_list || [];
+        coverUrl = pickCover(originCover) || pickCover(post.video?.cover?.url_list || []);
+      } else if (isImage && post.images?.length) {
+        coverUrl = pickCover(post.images[0].url_list || []);
+      }
+      if (!coverUrl) {
+        coverUrl = post.video?.cover?.url_list?.[0] || "";
+      }
+
       db.insert(works)
         .values({
           awemeId: post.aweme_id,
           bloggerId: blogger.id,
           desc: post.desc || "",
-          videoUrl: post.video?.download_addr?.url_list?.[0] || null,
+          videoUrl: isVideo
+            ? post.video?.download_addr?.url_list?.[0] || null
+            : null,
           duration: post.video?.duration || 0,
-          coverUrl: post.video?.cover?.url_list?.[0] || "",
+          coverUrl,
           shareUrl: post.share_url || "",
           statistics: JSON.stringify(post.statistics || {}),
           publishedAt: post.create_time,
-          transcriptStatus: "pending", // 等 ASR 就绪后再处理
+          transcriptStatus: isVideo ? "pending" : "done",
         })
         .run();
     }

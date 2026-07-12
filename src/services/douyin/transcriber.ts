@@ -2,6 +2,7 @@
 // 讯飞 ASR 适配器：语音听写 IAT（≤60s） + 语音转写 LFASR（>60s）
 import * as fs from "fs";
 import * as crypto from "crypto";
+import WebSocket from "ws";
 
 const ASR_API_KEY = process.env.ASR_API_KEY || "";
 const ASR_API_SECRET = process.env.ASR_API_SECRET || "";
@@ -226,6 +227,8 @@ async function transcribeLong(audioPath: string): Promise<string> {
     throw new Error("LFASR submit returned no task_id");
   }
 
+  console.log(`  [asr] LFASR 提交成功, task_id=${taskId}, 开始轮询...`);
+
   // Step 2: 轮询结果（间隔 10s，最多等 5 分钟）
   const resultUrl = `https://${host}/v2/api/result`;
   const maxAttempts = 30;
@@ -276,7 +279,9 @@ async function transcribeLong(audioPath: string): Promise<string> {
     if (resultJson.data?.status === 2) {
       const segments = resultJson.data.result || [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return segments.map((seg: any) => seg.onebest || "").join("");
+      const text = segments.map((seg: any) => seg.onebest || "").join("");
+      console.log(`  [asr] LFASR 完成 → ${text.length} 字符`);
+      return text;
     }
 
     if (resultJson.data?.status === 3) {
@@ -312,8 +317,10 @@ export async function transcribeAudio(
   const durationSec = durationMs / 1000;
 
   if (durationSec <= 60) {
+    console.log(`  [asr] 使用 IAT 短音频接口 (${durationSec.toFixed(0)}s)`);
     return transcribeShort(audioPath);
   }
+  console.log(`  [asr] 使用 LFASR 长音频接口 (${durationSec.toFixed(0)}s)`);
   return transcribeLong(audioPath);
 }
 

@@ -30,6 +30,7 @@ export async function downloadVideo(
 
   // 幂等：已存在直接返回
   if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+    console.log(`  [download] ${awemeId} 已存在，跳过`);
     return filePath;
   }
 
@@ -38,6 +39,7 @@ export async function downloadVideo(
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      console.log(`  [download] ${awemeId} 尝试 ${attempt + 1}/3...`);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
@@ -85,9 +87,12 @@ export async function downloadVideo(
         fileStream.on("finish", resolve);
         fileStream.on("error", reject);
       });
+      const sizeMB = (fs.statSync(filePath).size / 1024 / 1024).toFixed(1);
+      console.log(`  [download] ${awemeId} 完成 → ${sizeMB}MB`);
       return filePath;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      console.error(`  [download] ${awemeId} 尝试 ${attempt + 1} 失败: ${lastError.message}`);
       if (attempt < 2) {
         await sleep(Math.pow(2, attempt) * 1000); // 1s / 2s / 4s
       }

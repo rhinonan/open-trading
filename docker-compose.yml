@@ -1,0 +1,11 @@
+services:
+  open-trading:
+    build: .
+    container_name: open-trading
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
