@@ -53,12 +53,17 @@ export async function downloadVideo(
       if (!res.ok) {
         // CDN 链接过期，回捞最新地址
         if (res.status === 403 || res.status === 404) {
-          const fresh = await fetchOneVideo(awemeId);
-          const newUrl =
-            fresh?.video?.download_addr?.url_list?.[0];
-          if (newUrl && newUrl !== currentUrl) {
-            currentUrl = newUrl;
-            continue; // 用新地址重试
+          try {
+            const fresh = await fetchOneVideo(awemeId);
+            const newUrl =
+              fresh?.video?.download_addr?.url_list?.[0];
+            if (newUrl && newUrl !== currentUrl) {
+              currentUrl = newUrl;
+              continue; // 用新地址重试
+            }
+          } catch {
+            // fetchOneVideo failed — don't retry, this is terminal
+            throw new Error(`CDN link expired and failed to fetch fresh URL for ${awemeId}`);
           }
         }
         throw new Error(
@@ -66,8 +71,20 @@ export async function downloadVideo(
         );
       }
 
-      const buffer = Buffer.from(await res.arrayBuffer());
-      fs.writeFileSync(filePath, buffer);
+      // Stream response body directly to disk to avoid full-buffer in RAM
+      const fileStream = fs.createWriteStream(filePath);
+      const reader = res.body!.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fileStream.write(Buffer.from(value));
+      }
+      fileStream.end();
+      // Wait for write to finish
+      await new Promise<void>((resolve, reject) => {
+        fileStream.on("finish", resolve);
+        fileStream.on("error", reject);
+      });
       return filePath;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
