@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import type {
   DouyinBlogger,
   DouyinEvaluation,
+  DouyinWork,
   PredictionItem,
 } from "@/types";
 
@@ -31,7 +32,23 @@ export default function BloggerDetailPage({
     Array<DouyinEvaluation & { items: PredictionItem[] }>
   >([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"records" | "trend">("records");
+  const [tab, setTab] = useState<"records" | "trend" | "works">("records");
+  const [works, setWorks] = useState<DouyinWork[]>([]);
+  const [worksLoading, setWorksLoading] = useState(false);
+
+  const loadWorks = useCallback(async () => {
+    setWorksLoading(true);
+    try {
+      const res = await fetch(`/api/douyin/bloggers/${id}?include=works`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorks(data.works || []);
+      }
+    } catch {
+      // silent fail
+    }
+    setWorksLoading(false);
+  }, [id]);
 
   useEffect(() => {
     async function load() {
@@ -151,6 +168,16 @@ export default function BloggerDetailPage({
         >
           准确率趋势
         </button>
+        <button
+          onClick={() => { setTab("works"); loadWorks(); }}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            tab === "works"
+              ? "bg-accent text-accent-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          作品列表
+        </button>
       </div>
 
       {/* Records Tab */}
@@ -263,6 +290,80 @@ export default function BloggerDetailPage({
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Works Tab */}
+      {tab === "works" && (
+        <div className="space-y-4">
+          {worksLoading ? (
+            <Skeleton className="h-64 rounded-lg" />
+          ) : works.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="text-center py-12">
+                <p className="text-muted-foreground">暂无作品</p>
+                <p className="text-sm text-muted-foreground/60 mt-1">
+                  扫描后将自动拉取作品并转写
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            works.map((work) => {
+              const statusCfg = {
+                pending: { label: "等待中", className: "bg-muted text-muted-foreground" },
+                processing: { label: "转写中...", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+                done: { label: "已转写", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+                failed: { label: "转写失败", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+              }[work.transcriptStatus] || { label: work.transcriptStatus, className: "bg-muted" };
+
+              const stats = JSON.parse(work.statistics || "{}");
+
+              return (
+                <Card key={work.id}>
+                  <CardContent className="pt-6">
+                    {/* First row: desc + status */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm line-clamp-3">
+                          {work.desc || "(无文案)"}
+                        </p>
+                      </div>
+                      <Badge className={`shrink-0 ${statusCfg.className}`}>
+                        {statusCfg.label}
+                      </Badge>
+                    </div>
+
+                    {/* Second row: time and engagement stats */}
+                    <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                      <span>
+                        {new Date(work.publishedAt * 1000).toLocaleString("zh-CN", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span>👍 {stats.digg_count || 0}</span>
+                      <span>💬 {stats.comment_count || 0}</span>
+                      <span>↗ {stats.share_count || 0}</span>
+                    </div>
+
+                    {/* Third row: collapsible transcript */}
+                    {work.transcript && work.transcriptStatus === "done" && (
+                      <details className="mt-3">
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                          查看转写全文
+                        </summary>
+                        <p className="mt-2 text-sm p-3 rounded-md bg-muted/50 whitespace-pre-wrap">
+                          {work.transcript}
+                        </p>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
       )}
     </div>
   );
