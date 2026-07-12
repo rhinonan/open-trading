@@ -315,7 +315,12 @@ export default function BloggerDetailPage({
                 failed: { label: "转写失败", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
               }[work.transcriptStatus] || { label: work.transcriptStatus, className: "bg-muted" };
 
-              const stats = JSON.parse(work.statistics || "{}");
+              let stats: Record<string, number> = {};
+              try {
+                stats = JSON.parse(work.statistics || "{}");
+              } catch {
+                // Use empty stats on parse failure
+              }
 
               return (
                 <Card key={work.id}>

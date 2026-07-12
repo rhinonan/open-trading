@@ -6,8 +6,20 @@ import * as crypto from "crypto";
 const ASR_API_KEY = process.env.ASR_API_KEY || "";
 const ASR_API_SECRET = process.env.ASR_API_SECRET || "";
 
-// WAV 文件头固定 44 字节（RIFF header + fmt chunk + data chunk header）
-const WAV_HEADER_SIZE = 44;
+// Parse actual data chunk offset from RIFF header (handles extended chunks)
+function findWavDataOffset(buffer: Buffer): number {
+  // RIFF header: "RIFF" (4) + fileSize (4) + "WAVE" (4) = 12 bytes
+  // Then chunks: "fmt " (4) + chunkSize (4) + data
+  // We need to find the "data" chunk
+  let offset = 12;
+  while (offset < buffer.length - 8) {
+    const chunkId = buffer.toString("ascii", offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    if (chunkId === "data") return offset + 8;
+    offset += 8 + chunkSize;
+  }
+  return 44; // fallback to standard
+}
 
 // ============================================================
 // 鉴权工具（通用）
@@ -87,7 +99,7 @@ function transcribeShort(audioPath: string): Promise<string> {
       // Step 2: 分帧发送音频数据，每帧 ≤1280 bytes
       // 音频文件为 WAV 格式，需跳过 44 字节头，只发送原始 PCM 数据
       const fileBuf = fs.readFileSync(audioPath);
-      const audioBuf = fileBuf.subarray(WAV_HEADER_SIZE);
+      const audioBuf = fileBuf.subarray(findWavDataOffset(fileBuf));
       const frameSize = 1280;
       for (let i = 0; i < audioBuf.length; i += frameSize) {
         const chunk = audioBuf.subarray(i, i + frameSize);
