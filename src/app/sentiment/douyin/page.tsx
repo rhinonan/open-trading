@@ -14,6 +14,7 @@ import {
   BarChart3,
   UserPlus,
   Loader2,
+  Mic,
 } from "lucide-react";
 import type { DouyinBlogger } from "@/types";
 
@@ -30,6 +31,7 @@ export default function DouyinPage() {
   const [uidInput, setUidInput] = useState("");
   const [scanning, setScanning] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [message, setMessage] = useState("");
 
   const fetchBloggers = useCallback(async () => {
@@ -96,6 +98,26 @@ export default function DouyinPage() {
       setMessage("评判失败");
     }
     setEvaluating(false);
+  };
+
+  const handleTranscribe = async () => {
+    setTranscribing(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/douyin/transcribe", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(
+          `转写完成：共 ${data.total} 条，成功 ${data.done} 条` +
+            (data.failed > 0 ? `，失败 ${data.failed} 条` : "")
+        );
+      } else {
+        setMessage(`转写失败: ${data.error}`);
+      }
+    } catch {
+      setMessage("转写请求失败，请检查网络");
+    }
+    setTranscribing(false);
   };
 
   return (
@@ -169,6 +191,14 @@ export default function DouyinPage() {
             <BarChart3 className="h-4 w-4 mr-2" />
           )}
           收盘评判
+        </Button>
+        <Button variant="outline" onClick={handleTranscribe} disabled={transcribing}>
+          {transcribing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Mic className="h-4 w-4 mr-2" />
+          )}
+          开始转写
         </Button>
       </div>
 
