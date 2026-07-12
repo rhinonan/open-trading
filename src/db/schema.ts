@@ -28,6 +28,7 @@ export const works = sqliteTable("works", {
     .notNull()
     .references(() => bloggers.id, { onDelete: "cascade" }),
   desc: text("desc").notNull().default(""),
+  videoUrl: text("video_url"),
   transcript: text("transcript"),
   transcriptStatus: text("transcript_status", {
     enum: ["pending", "processing", "done", "failed"],
