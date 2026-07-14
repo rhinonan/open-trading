@@ -41,7 +41,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# database
-/data/*.db
-/data/*.db-*
-/data/api-cache/
+# runtime data (database, cache, media files)
+/data/

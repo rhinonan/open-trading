@@ -23,14 +23,15 @@ function findWavDataOffset(buffer: Buffer): number {
 }
 
 // ============================================================
-// 鉴权工具（通用）
+// 鉴权工具
 // ============================================================
 
+// IAT (语音听写) 鉴权：HMAC-SHA256
 function rfc1123Date(): string {
   return new Date().toUTCString();
 }
 
-function buildSignature(
+function buildIatSignature(
   host: string,
   date: string,
   httpMethod: string,
@@ -42,19 +43,27 @@ function buildSignature(
   return hmac.digest("base64");
 }
 
-function buildAuthorization(
+function buildIatAuthorization(
   host: string,
   date: string,
   httpMethod: string,
   httpPath: string
 ): string {
-  const signature = buildSignature(host, date, httpMethod, httpPath);
+  const signature = buildIatSignature(host, date, httpMethod, httpPath);
   const authObj = {
     api_key: ASR_API_KEY,
     algorithm: "hmac-sha256",
     signature,
   };
   return Buffer.from(JSON.stringify(authObj)).toString("base64");
+}
+
+// LFASR (语音转写) 鉴权：Base64(HmacSHA1(MD5(appId + ts), secretKey))
+// 注意：MD5 结果必须是 32 位小写十六进制字符串，不是 raw bytes！
+function buildLfasrSigna(appId: string, ts: number): string {
+  const md5Hex = crypto.createHash("md5").update(appId + String(ts)).digest("hex");
+  const hmac = crypto.createHmac("sha1", ASR_API_SECRET).update(md5Hex).digest();
+  return hmac.toString("base64");
 }
 
 // ============================================================
@@ -66,7 +75,7 @@ function transcribeShort(audioPath: string): Promise<string> {
     const host = "iat-api.xfyun.cn";
     const date = rfc1123Date();
     // 关键：authorization 必须使用与 URL 参数相同的 date，否则签名验证失败
-    const authorization = buildAuthorization(host, date, "GET", "/v2/iat");
+    const authorization = buildIatAuthorization(host, date, "GET", "/v2/iat");
 
     const url =
       `wss://${host}/v2/iat?` +
@@ -181,93 +190,132 @@ function transcribeShort(audioPath: string): Promise<string> {
 
 // ============================================================
 // 内部：讯飞语音转写 LFASR（>60s 长音频）
+// 接口文档：https://www.xfyun.cn/doc/asr/ifasr_new/API.html
 // ============================================================
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function transcribeLong(audioPath: string): Promise<string> {
-  const host = "raasr.xfyun.cn";
+/** LFASR 状态常量 */
+const LFASR_STATUS = {
+  CREATED: 0,      // 任务创建成功
+  EXTRACTING: 1,   // 音频特征提取中
+  EXTRACTED: 2,    // 音频特征提取完成
+  PROCESSING: 3,   // 转写处理中
+  COMPLETED: 4,    // 转写完成
+  FAILED: 5,       // 转写失败
+} as const;
 
-  // Step 1: 提交音频文件
-  const date = rfc1123Date();
-  const authorization = buildAuthorization(host, date, "POST", "/v2/api/submit");
-  const submitUrl = `https://${host}/v2/api/submit`;
+async function transcribeLong(audioPath: string, durationMs: number): Promise<string> {
+  const host = "raasr.xfyun.cn";
+  const appId = ASR_API_KEY;
 
   const audioBuffer = fs.readFileSync(audioPath);
-  const formData = new FormData();
-  formData.append("file", new Blob([audioBuffer]), "audio.wav");
+  const fileSize = audioBuffer.length;
 
-  const submitRes = await fetch(submitUrl, {
-    method: "POST",
-    headers: {
-      Host: host,
-      Date: date,
-      Authorization: authorization,
-    },
-    body: formData,
+  // ============================================================
+  // Step 1: 上传音频文件
+  // POST https://raasr.xfyun.cn/v2/api/upload
+  // 鉴权参数通过 URL query string 传递
+  // ============================================================
+  const uploadTs = Math.floor(Date.now() / 1000);
+  const uploadSigna = buildLfasrSigna(appId, uploadTs);
+
+  const uploadParams = new URLSearchParams({
+    appId,
+    signa: uploadSigna,
+    ts: String(uploadTs),
+    fileSize: String(fileSize),
+    fileName: "audio.wav",
+    duration: String(durationMs),
+    language: "cn",
   });
 
-  if (!submitRes.ok) {
+  const uploadUrl = `https://${host}/v2/api/upload?${uploadParams}`;
+
+  console.log(`  [asr] LFASR 上传中, fileSize=${fileSize}, duration=${durationMs}ms`);
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: audioBuffer,
+  });
+
+  if (!uploadRes.ok) {
     throw new Error(
-      `LFASR submit failed: HTTP ${submitRes.status} ${submitRes.statusText}`
+      `LFASR upload failed: HTTP ${uploadRes.status} ${uploadRes.statusText}`
     );
   }
 
-  const submitJson = await submitRes.json();
-  if (submitJson.code !== 0) {
+  const uploadJson = await uploadRes.json();
+
+  // LFASR API: code 可能是字符串 "000000" 或数字 0
+  const uploadOk = uploadJson.code === "000000" || uploadJson.code === 0;
+  if (!uploadOk) {
+    const errMsg = uploadJson.descInfo || uploadJson.message || "unknown";
     throw new Error(
-      `LFASR submit error: code=${submitJson.code}, ${submitJson.message}`
+      `LFASR upload error: code=${uploadJson.code}, message=${errMsg}`
     );
   }
 
-  const taskId: string = submitJson.data?.task_id;
-  if (!taskId) {
-    throw new Error("LFASR submit returned no task_id");
+  // 响应体：content.orderId（新版）或 data.orderId（部分实现）
+  const orderId: string =
+    uploadJson.content?.orderId ||
+    uploadJson.data?.orderId ||
+    uploadJson.data?.task_id;
+  if (!orderId) {
+    throw new Error(
+      `LFASR upload returned no orderId: ${JSON.stringify(uploadJson)}`
+    );
   }
 
-  console.log(`  [asr] LFASR 提交成功, task_id=${taskId}, 开始轮询...`);
+  console.log(`  [asr] LFASR 上传成功, orderId=${orderId}, 开始轮询...`);
 
-  // Step 2: 轮询结果（间隔 10s，最多等 5 分钟）
-  const resultUrl = `https://${host}/v2/api/result`;
-  const maxAttempts = 30;
+  // ============================================================
+  // Step 2: 轮询结果（间隔 10s，最多等 8 分钟）
+  // GET https://raasr.xfyun.cn/v2/api/getResult
+  // ============================================================
+  const resultUrl = `https://${host}/v2/api/getResult`;
+  const maxAttempts = 48;
   let consecutiveFailures = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await sleep(10_000);
 
-    // 每次轮询需要新的 date 和签名（GET 请求）
-    const resultDate = rfc1123Date();
-    const resultAuth = buildAuthorization(host, resultDate, "GET", "/v2/api/result");
+    // 每次轮询需要新的 ts 和签名
+    const resultTs = Math.floor(Date.now() / 1000);
+    const resultSigna = buildLfasrSigna(appId, resultTs);
 
-    const resultRes = await fetch(
-      `${resultUrl}?task_id=${encodeURIComponent(taskId)}`,
-      {
-        headers: {
-          Host: host,
-          Date: resultDate,
-          Authorization: resultAuth,
-        },
-      }
-    );
+    const resultParams = new URLSearchParams({
+      appId,
+      signa: resultSigna,
+      ts: String(resultTs),
+      orderId,
+    });
+
+    const resultRes = await fetch(`${resultUrl}?${resultParams}`);
 
     if (!resultRes.ok) {
       consecutiveFailures++;
       if (consecutiveFailures >= 3) {
         throw new Error(
-          `LFASR poll failed after ${consecutiveFailures} consecutive errors: HTTP ${resultRes.status}`
+          `LFASR poll failed after ${consecutiveFailures} consecutive HTTP errors: ${resultRes.status}`
         );
       }
       continue;
     }
 
     const resultJson = await resultRes.json();
-    if (resultJson.code !== 0) {
+
+    // code: "000000" (string) 或 0 (integer) 表示成功
+    const resultOk = resultJson.code === "000000" || resultJson.code === 0;
+    if (!resultOk) {
       consecutiveFailures++;
+      const errMsg = resultJson.descInfo || resultJson.message || "unknown";
       if (consecutiveFailures >= 3) {
         throw new Error(
-          `LFASR poll failed after ${consecutiveFailures} consecutive errors: code=${resultJson.code}`
+          `LFASR poll failed after ${consecutiveFailures} consecutive API errors: code=${resultJson.code}, message=${errMsg}`
         );
       }
       continue;
@@ -275,21 +323,67 @@ async function transcribeLong(audioPath: string): Promise<string> {
 
     consecutiveFailures = 0;
 
-    // status: 1=处理中, 2=完成, 3=失败
-    if (resultJson.data?.status === 2) {
-      const segments = resultJson.data.result || [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const text = segments.map((seg: any) => seg.onebest || "").join("");
+    // 响应结构：content.orderInfo（LFASR v2）或 data（旧版）
+    const orderInfo = resultJson.content?.orderInfo || resultJson.data;
+    const status = orderInfo?.status;
+    const statusDesc = orderInfo?.statusDesc || orderInfo?.desc || "";
+
+    // status 4 = 转写完成
+    if (status === LFASR_STATUS.COMPLETED) {
+      // orderResult 是 JSON 字符串
+      const orderResultRaw: string =
+        resultJson.content?.orderResult || resultJson.data?.result || "";
+
+      if (!orderResultRaw) {
+        console.log("  [asr] LFASR 完成但结果为空");
+        return "";
+      }
+
+      // 解析 lattice 结构：{ lattice: [{ json_1best: "{...}" }] }
+      const parts: string[] = [];
+      try {
+        const orderResult = JSON.parse(orderResultRaw);
+        const lattice = orderResult.lattice || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const item of lattice) {
+          try {
+            const json1best = JSON.parse(item.json_1best);
+            const rt = json1best?.st?.rt || [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const rtItem of rt) {
+              const ws = rtItem.ws || [];
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              for (const w of ws) {
+                const cw = w.cw || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                for (const c of cw) {
+                  if (c.w) parts.push(c.w);
+                }
+              }
+            }
+          } catch {
+            // 跳过无法解析的片段
+          }
+        }
+      } catch {
+        // 如果 orderResult 不是 JSON，直接返回
+        return orderResultRaw;
+      }
+
+      const text = parts.join("");
       console.log(`  [asr] LFASR 完成 → ${text.length} 字符`);
       return text;
     }
 
-    if (resultJson.data?.status === 3) {
+    // status 5 = 转写失败
+    if (status === LFASR_STATUS.FAILED) {
       throw new Error(
-        `LFASR task failed: ${JSON.stringify(resultJson.data)}`
+        `LFASR task failed: ${JSON.stringify(orderInfo)}`
       );
     }
-    // status === 1 继续轮询
+
+    // status 0-3 继续轮询，输出进度
+    console.log(`  [asr] LFASR 轮询 ${attempt + 1}/${maxAttempts}, status=${status}${statusDesc ? ` (${statusDesc})` : ""}`);
   }
 
   throw new Error(`LFASR polling timed out after ${maxAttempts * 10}s`);
@@ -321,7 +415,7 @@ export async function transcribeAudio(
     return transcribeShort(audioPath);
   }
   console.log(`  [asr] 使用 LFASR 长音频接口 (${durationSec.toFixed(0)}s)`);
-  return transcribeLong(audioPath);
+  return transcribeLong(audioPath, durationMs);
 }
 
 /**
