@@ -11,7 +11,6 @@ import {
   Moon,
   Monitor,
   Radio,
-  Plus,
   RefreshCw,
   Mic,
   Loader2,
@@ -90,7 +89,11 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/douyin/scan", { method: "POST" });
       const data = await res.json();
-      setMessage(`扫描完成：检查了 ${data.total} 个博主，发现 ${data.totalNewWorks} 条新作品`);
+      if (res.ok) {
+        setMessage(`扫描完成：检查了 ${data.total} 个博主，发现 ${data.totalNewWorks} 条新作品`);
+      } else {
+        setMessage(`扫描失败: ${data.error}`);
+      }
     } catch {
       setMessage("扫描失败");
     }
