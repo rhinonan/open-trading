@@ -123,16 +123,12 @@ export default function BloggerDetailPage({
                   variant={
                     blogger.category === "predictor"
                       ? "default"
-                      : blogger.category === "non_predictor"
-                        ? "outline"
-                        : "secondary"
+                      : "outline"
                   }
                 >
                   {blogger.category === "predictor"
                     ? "预测型博主"
-                    : blogger.category === "non_predictor"
-                      ? "非预测型"
-                      : "定位中..."}
+                    : "技术型博主"}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {blogger.followerCount.toLocaleString()} 粉丝

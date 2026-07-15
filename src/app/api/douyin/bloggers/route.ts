@@ -5,9 +5,8 @@ import * as bloggerService from "@/services/douyin/blogger-service";
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const category = searchParams.get("category") as
-    | "pending"
     | "predictor"
-    | "non_predictor"
+    | "technical"
     | null;
 
   try {
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const { douyinUid } = await request.json();
+    const { douyinUid, category } = await request.json();
     if (!douyinUid || typeof douyinUid !== "string") {
       return Response.json(
         { error: "douyinUid is required" },
@@ -31,7 +30,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const blogger = await bloggerService.addBlogger(douyinUid);
+    const validCategories = ["predictor", "technical"] as const;
+    const resolvedCategory =
+      category && validCategories.includes(category)
+        ? (category as "predictor" | "technical")
+        : undefined;
+
+    const blogger = await bloggerService.addBlogger(douyinUid, resolvedCategory);
     return Response.json(blogger, { status: 201 });
   } catch (err) {
     const message =
