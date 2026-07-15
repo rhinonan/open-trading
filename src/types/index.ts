@@ -113,31 +113,32 @@ export interface DashboardStats {
 
 // ==================== 抖音博主监控 ====================
 
-export type BloggerCategory = "predictor" | "technical";
-export type TranscriptStatus = "pending" | "processing" | "done" | "failed";
-export type PredictionType =
-  | "market_direction"
-  | "index_level"
-  | "sector"
-  | "stock_pick";
+export type JudgmentResult =
+  | "correct"
+  | "mostly_correct"
+  | "incorrect"
+  | "not_applicable";
 
-export interface DouyinBloggerWithOpinion extends DouyinBlogger {
-  latestOpinion: string;
-  latestWorkAt: number | null;
-}
+export type SortDimension = "followers" | "recent" | "accuracy";
+
+export type TranscriptStatus = "pending" | "processing" | "done" | "failed";
 
 export interface DouyinBlogger {
   id: number;
+  slug: string;
   douyinUid: string;
   nickname: string;
   avatarUrl: string;
   signature: string;
   followerCount: number;
-  category: BloggerCategory;
-  classifiedAt: number | null;
-  classificationNote: string | null;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface DouyinBloggerWithOpinion extends DouyinBlogger {
+  latestOpinion: string;
+  latestWorkAt: number | null;
+  accuracy: number | null;
 }
 
 export interface DouyinWork {
@@ -174,19 +175,10 @@ export interface PredictionItem {
   evaluationId: number;
   workId: number;
   predictedContent: string;
-  predictionType: PredictionType;
   predictionTarget: string;
   predictionDetail: string;
-  isCorrect: number | null;
-  judgment: string;
+  judgment: JudgmentResult;
   relatedSymbols: string;
-}
-
-export interface PredictionMix {
-  marketDirection: number;
-  indexLevel: number;
-  sector: number;
-  stockPick: number;
 }
 
 export interface MarketSnapshot {
