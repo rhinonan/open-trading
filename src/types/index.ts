@@ -113,7 +113,7 @@ export interface DashboardStats {
 
 // ==================== 抖音博主监控 ====================
 
-export type BloggerCategory = "pending" | "predictor" | "non_predictor";
+export type BloggerCategory = "predictor" | "technical";
 export type TranscriptStatus = "pending" | "processing" | "done" | "failed";
 export type PredictionType =
   | "market_direction"
@@ -143,6 +143,8 @@ export interface DouyinWork {
   transcript: string | null;
   transcriptStatus: TranscriptStatus;
   duration: number;
+  videoUrl: string | null;
+  opinionSummary: string;
   coverUrl: string;
   shareUrl: string;
   statistics: string;

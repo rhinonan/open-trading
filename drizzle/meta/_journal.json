@@ -15,6 +15,13 @@
       "when": 1783845900672,
       "tag": "0001_lovely_hairball",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784091748301,
+      "tag": "0002_wise_magma",
+      "breakpoints": true
     }
   ]
 }

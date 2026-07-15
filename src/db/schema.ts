@@ -8,9 +8,9 @@ export const bloggers = sqliteTable("bloggers", {
   avatarUrl: text("avatar_url").notNull().default(""),
   signature: text("signature").notNull().default(""),
   followerCount: integer("follower_count").notNull().default(0),
-  category: text("category", { enum: ["pending", "predictor", "non_predictor"] })
+  category: text("category", { enum: ["predictor", "technical"] })
     .notNull()
-    .default("pending"),
+    .default("predictor"),
   classifiedAt: integer("classified_at"),
   classificationNote: text("classification_note"),
   createdAt: integer("created_at")
@@ -36,6 +36,7 @@ export const works = sqliteTable("works", {
     .notNull()
     .default("pending"),
   duration: integer("duration").notNull().default(0),
+  opinionSummary: text("opinion_summary").notNull().default(""),
   coverUrl: text("cover_url").notNull().default(""),
   shareUrl: text("share_url").notNull().default(""),
   statistics: text("statistics").notNull().default("{}"),
