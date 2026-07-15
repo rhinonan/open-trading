@@ -1,4 +1,3 @@
-// src/app/api/douyin/records/route.ts
 import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { evaluations, predictionItems, bloggers } from "@/db/schema";
@@ -6,9 +5,8 @@ import { eq, and, desc } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const bloggerId = searchParams.get("blogger_id");
+  const bloggerSlug = searchParams.get("blogger_slug");
   const evalDate = searchParams.get("eval_date");
-  const type = searchParams.get("type");
 
   try {
     let query = db
@@ -26,8 +24,8 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(evaluations.evalDate))
       .$dynamic();
 
-    if (bloggerId) {
-      query = query.where(eq(evaluations.bloggerId, Number(bloggerId)));
+    if (bloggerSlug) {
+      query = query.where(eq(bloggers.slug, bloggerSlug));
     }
     if (evalDate) {
       query = query.where(eq(evaluations.evalDate, evalDate));
@@ -46,12 +44,6 @@ export async function GET(request: NextRequest) {
         });
       }
       if (row.items) {
-        if (
-          type &&
-          row.items.predictionType !== type
-        ) {
-          continue;
-        }
         grouped.get(row.evaluation.id)!.items.push(row.items);
       }
     }
