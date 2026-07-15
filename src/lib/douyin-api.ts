@@ -116,17 +116,28 @@ export interface DouyinVideoData {
   }>;
 }
 
+export interface FetchPostsResult {
+  awemeList: DouyinVideoData[];
+  nextCursor: number;
+  hasMore: boolean;
+}
+
 export async function fetchUserPosts(
   secUid: string,
-  count = 10
-): Promise<DouyinVideoData[]> {
+  maxCursor = 0,
+  count = 20
+): Promise<FetchPostsResult> {
   try {
     const json = await tikHubFetch<any>(
-      `/api/v1/douyin/app/v3/fetch_user_post_videos?sec_user_id=${encodeURIComponent(secUid)}&max_cursor=0&count=${count}`
+      `/api/v1/douyin/app/v3/fetch_user_post_videos?sec_user_id=${encodeURIComponent(secUid)}&max_cursor=${maxCursor}&count=${count}`
     );
-    return json.data?.aweme_list ?? [];
+    return {
+      awemeList: json.data?.aweme_list ?? [],
+      nextCursor: json.data?.max_cursor ?? 0,
+      hasMore: json.data?.has_more ?? false,
+    };
   } catch {
-    return [];
+    return { awemeList: [], nextCursor: 0, hasMore: false };
   }
 }
 
