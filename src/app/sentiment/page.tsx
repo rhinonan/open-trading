@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, Radio } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 export default function SentimentPage() {
   return (
@@ -12,25 +11,8 @@ export default function SentimentPage() {
         </p>
       </div>
 
-      {/* Sub-nav tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        <Link
-          href="/sentiment"
-          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md bg-accent text-accent-foreground"
-        >
-          <MessageCircle className="h-4 w-4" />
-          舆情概览
-        </Link>
-        <Link
-          href="/sentiment/douyin"
-          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
-          <Radio className="h-4 w-4" />
-          抖音监控
-        </Link>
-      </div>
 
-      <Card className="flex items-center justify-center min-h-[400px] border-dashed">
+<Card className="flex items-center justify-center min-h-[400px] border-dashed">
         <CardContent className="text-center py-12">
           <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground/40" />
           <p className="mt-4 text-lg text-muted-foreground">
