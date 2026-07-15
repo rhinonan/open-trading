@@ -6,6 +6,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 const BREADCRUMB_MAP: Record<string, string> = {
   "/": "仪表盘",
+  "/douyin": "抖音雷达",
   "/stocks": "个股分析",
   "/industry": "行业分析",
   "/sentiment": "舆情分析",

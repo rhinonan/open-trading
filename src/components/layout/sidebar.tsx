@@ -26,9 +26,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  Radio,
 } from "lucide-react";
 
 const NAV_ITEMS = [
+  { label: "抖音雷达", href: "/douyin", icon: Radio },
   { label: "仪表盘", href: "/", icon: LayoutDashboard },
   { label: "个股分析", href: "/stocks", icon: TrendingUp },
   { label: "行业分析", href: "/industry", icon: Building2 },
