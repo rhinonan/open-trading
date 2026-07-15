@@ -3,16 +3,12 @@ import { sql } from "drizzle-orm";
 
 export const bloggers = sqliteTable("bloggers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  slug: text("slug").notNull().default(""),
   douyinUid: text("douyin_uid").notNull().unique(),
   nickname: text("nickname").notNull(),
   avatarUrl: text("avatar_url").notNull().default(""),
   signature: text("signature").notNull().default(""),
   followerCount: integer("follower_count").notNull().default(0),
-  category: text("category", { enum: ["predictor", "technical"] })
-    .notNull()
-    .default("predictor"),
-  classifiedAt: integer("classified_at"),
-  classificationNote: text("classification_note"),
   createdAt: integer("created_at")
     .notNull()
     .default(sql`(unixepoch())`),
@@ -71,12 +67,12 @@ export const predictionItems = sqliteTable("prediction_items", {
     .notNull()
     .references(() => works.id, { onDelete: "cascade" }),
   predictedContent: text("predicted_content").notNull(),
-  predictionType: text("prediction_type", {
-    enum: ["market_direction", "index_level", "sector", "stock_pick"],
-  }).notNull(),
   predictionTarget: text("prediction_target").notNull().default(""),
   predictionDetail: text("prediction_detail").notNull().default("{}"),
-  isCorrect: integer("is_correct"),
-  judgment: text("judgment").notNull().default(""),
+  judgment: text("judgment", {
+    enum: ["correct", "mostly_correct", "incorrect", "not_applicable"],
+  })
+    .notNull()
+    .default("not_applicable"),
   relatedSymbols: text("related_symbols").notNull().default("[]"),
 });
