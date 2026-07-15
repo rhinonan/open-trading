@@ -75,11 +75,12 @@ export default function BloggerDetailPage({
     if (blogger) {
       if (blogger.category === "technical") {
         setTab("opinions");
+        loadWorks();
       } else {
         setTab("records");
       }
     }
-  }, [blogger]);
+  }, [blogger, loadWorks]);
 
   if (loading) {
     return (
@@ -147,7 +148,7 @@ export default function BloggerDetailPage({
                   {categoryLabels[blogger.category] || blogger.category}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {blogger.followerCount.toLocaleString()} 粉丝
+                  {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
                 </span>
               </div>
               {blogger.classificationNote && (

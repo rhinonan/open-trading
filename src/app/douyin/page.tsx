@@ -20,15 +20,24 @@ export default function DouyinPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch("/api/douyin/bloggers?include=latest_opinion");
-      if (res.ok) setBloggers(await res.json());
+      try {
+        const res = await fetch("/api/douyin/bloggers?include=latest_opinion");
+        if (res.ok) setBloggers(await res.json());
+      } catch {
+        // network error — show empty state
+      }
       setLoading(false);
     }
     load();
   }, []);
 
-  const filtered = bloggers.filter((b) => b.category === activeTab);
-  const predictorCount = bloggers.filter((b) => b.category === "predictor").length;
+  const filtered = bloggers.filter((b) => {
+    if (b.category === activeTab) return true;
+    // Fallback: show unrecognized categories in predictor tab
+    if (activeTab === "predictor" && b.category !== "technical") return true;
+    return false;
+  });
+  const predictorCount = bloggers.filter((b) => b.category !== "technical").length;
   const technicalCount = bloggers.filter((b) => b.category === "technical").length;
 
   if (loading) {
@@ -179,7 +188,7 @@ export default function DouyinPage() {
                             {cat.label}
                           </Badge>
                           <span className="text-xs text-muted-foreground shrink-0">
-                            {blogger.followerCount.toLocaleString()} 粉丝
+                            {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
                           </span>
                         </div>
 

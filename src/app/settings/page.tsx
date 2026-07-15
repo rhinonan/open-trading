@@ -16,6 +16,7 @@ import {
   Loader2,
   Trash2,
   UserPlus,
+  BarChart3,
 } from "lucide-react";
 import type { DouyinBlogger } from "@/types";
 
@@ -33,6 +34,7 @@ export default function SettingsPage() {
   const [adding, setAdding] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
   const [message, setMessage] = useState("");
 
   const fetchBloggers = useCallback(async () => {
@@ -115,6 +117,23 @@ export default function SettingsPage() {
       setMessage("转写请求失败");
     }
     setTranscribing(false);
+  };
+
+  const handleEvaluate = async () => {
+    setEvaluating(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/douyin/evaluate", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`评判完成：${data.totalBloggers} 个博主，共 ${data.totalPredictions} 条预测`);
+      } else {
+        setMessage(`评判失败: ${data.error}`);
+      }
+    } catch {
+      setMessage("评判请求失败，请检查网络");
+    }
+    setEvaluating(false);
   };
 
   return (
@@ -212,7 +231,7 @@ export default function SettingsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{blogger.nickname}</p>
                         <p className="text-xs text-muted-foreground">
-                          {blogger.followerCount.toLocaleString()} 粉丝
+                          {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
                         </p>
                       </div>
                       <Badge variant={cat.variant} className="shrink-0 text-xs">
@@ -244,6 +263,10 @@ export default function SettingsPage() {
               <Button variant="outline" onClick={handleTranscribe} disabled={transcribing}>
                 {transcribing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mic className="h-4 w-4 mr-2" />}
                 开始转写
+              </Button>
+              <Button variant="outline" onClick={handleEvaluate} disabled={evaluating}>
+                {evaluating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BarChart3 className="h-4 w-4 mr-2" />}
+                收盘评判
               </Button>
             </div>
           </div>
