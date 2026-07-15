@@ -5,6 +5,7 @@ import { eq, inArray, asc } from "drizzle-orm";
 import { downloadVideo } from "./video-downloader";
 import { extractAudio } from "./audio-extractor";
 import { transcribeAudio } from "./transcriber";
+import { extractOpinion } from "./opinion-service";
 
 // ============================================================
 // 类型
@@ -108,11 +109,22 @@ async function processOneWork(row: WorkRow): Promise<TaskResult> {
     const transcript = await transcribeAudio(audioPath, effectiveDuration);
     console.log(`${logPrefix} 语音转写完成 → ${transcript.length} 字符`);
 
-    // 6. 回写 DB
+    // 6. 提取观点摘要
+    let opinionSummary = "";
+    try {
+      console.log(`${logPrefix} 开始提取观点摘要...`);
+      opinionSummary = await extractOpinion(transcript);
+      console.log(`${logPrefix} 观点摘要 → ${opinionSummary.slice(0, 50)}...`);
+    } catch (opinionErr) {
+      console.error(`${logPrefix} 观点提取失败（非致命）:`, opinionErr);
+    }
+
+    // 7. 回写 DB（含 transcript + opinion_summary）
     db.update(works)
       .set({
         transcript,
         transcriptStatus: "done",
+        opinionSummary,
       })
       .where(eq(works.id, id))
       .run();
