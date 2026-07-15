@@ -1,44 +1,34 @@
-// src/services/douyin/blogger-service.ts
+import { createHash } from "crypto";
 import { db } from "@/db";
-import { bloggers, works } from "@/db/schema";
+import { bloggers } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { fetchUserProfile, fetchUserPosts } from "@/lib/douyin-api";
-import type { DouyinBlogger, BloggerCategory } from "@/types";
+import { fetchUserProfile } from "@/lib/douyin-api";
+import type { DouyinBlogger } from "@/types";
 
-export async function listBloggers(
-  category?: BloggerCategory
-): Promise<DouyinBlogger[]> {
-  if (category) {
-    return db
-      .select()
-      .from(bloggers)
-      .where(eq(bloggers.category, category))
-      .orderBy(desc(bloggers.createdAt))
-      .all() as DouyinBlogger[];
-  }
+function computeSlug(douyinUid: string): string {
+  return createHash("sha256").update(douyinUid).digest("hex").slice(0, 12);
+}
+
+export async function listBloggers(): Promise<DouyinBlogger[]> {
   return db
     .select()
     .from(bloggers)
-    .orderBy(desc(bloggers.createdAt))
+    .orderBy(desc(bloggers.followerCount))
     .all() as DouyinBlogger[];
 }
 
-export async function getBloggerById(
-  id: number
+export async function getBloggerBySlug(
+  slug: string
 ): Promise<DouyinBlogger | null> {
   const result = db
     .select()
     .from(bloggers)
-    .where(eq(bloggers.id, id))
+    .where(eq(bloggers.slug, slug))
     .get();
   return (result as DouyinBlogger) ?? null;
 }
 
-export async function addBlogger(
-  douyinUid: string,
-  category: BloggerCategory = "predictor"
-): Promise<DouyinBlogger> {
-  // Check for duplicates
+export async function addBlogger(douyinUid: string): Promise<DouyinBlogger> {
   const existing = db
     .select()
     .from(bloggers)
@@ -48,13 +38,11 @@ export async function addBlogger(
     throw new Error(`博主 ${douyinUid} 已存在`);
   }
 
-  // Fetch user profile from TikHub
   const profile = await fetchUserProfile(douyinUid);
   if (!profile) {
     throw new Error(`无法获取博主 ${douyinUid} 的信息，请检查 ID 是否正确`);
   }
 
-  // url_list 中前几个通常是 .heic（浏览器不支持），优先取 jpeg/png/webp
   const pickAvatarUrl = (urls?: string[]): string => {
     if (!urls?.length) return "";
     return urls.find((u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u)) || urls[0];
@@ -67,12 +55,12 @@ export async function addBlogger(
   const blogger = db
     .insert(bloggers)
     .values({
+      slug: computeSlug(douyinUid),
       douyinUid: douyinUid,
       nickname: profile.nickname || "",
       avatarUrl: avatar,
       signature: profile.signature || "",
       followerCount: profile.follower_count || 0,
-      category,
     })
     .returning()
     .get() as DouyinBlogger;
@@ -83,4 +71,3 @@ export async function addBlogger(
 export async function deleteBlogger(id: number): Promise<void> {
   db.delete(bloggers).where(eq(bloggers.id, id)).run();
 }
-
