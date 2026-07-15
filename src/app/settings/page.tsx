@@ -1,18 +1,129 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { Settings, Sun, Moon, Monitor } from "lucide-react";
+import {
+  Settings,
+  Sun,
+  Moon,
+  Monitor,
+  Radio,
+  Plus,
+  RefreshCw,
+  Mic,
+  Loader2,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+import type { DouyinBlogger } from "@/types";
+
+const categoryLabels: Record<string, { label: string; variant: "default" | "secondary" }> = {
+  predictor: { label: "预测类", variant: "default" },
+  technical: { label: "技术类", variant: "secondary" },
+};
 
 export default function SettingsPage() {
+  // --- 抖音管理状态 ---
+  const [bloggers, setBloggers] = useState<DouyinBlogger[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uidInput, setUidInput] = useState("");
+  const [categorySelect, setCategorySelect] = useState<"predictor" | "technical">("predictor");
+  const [adding, setAdding] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const fetchBloggers = useCallback(async () => {
+    const res = await fetch("/api/douyin/bloggers");
+    if (res.ok) setBloggers(await res.json());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchBloggers(); }, [fetchBloggers]);
+
+  const handleAdd = async () => {
+    if (!uidInput.trim()) return;
+    setAdding(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/douyin/bloggers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ douyinUid: uidInput.trim(), category: categorySelect }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUidInput("");
+        setMessage(`已添加 ${data.nickname}`);
+        fetchBloggers();
+      } else {
+        setMessage(`错误: ${data.error}`);
+      }
+    } catch {
+      setMessage("添加失败，请检查网络");
+    }
+    setAdding(false);
+  };
+
+  const handleDelete = async (id: number, nickname: string) => {
+    if (!confirm(`确定要删除博主「${nickname}」吗？相关作品和评判记录将一并删除。`)) return;
+    try {
+      const res = await fetch(`/api/douyin/bloggers/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setMessage(`已删除 ${nickname}`);
+        fetchBloggers();
+      } else {
+        const data = await res.json();
+        setMessage(`错误: ${data.error}`);
+      }
+    } catch {
+      setMessage("删除失败");
+    }
+  };
+
+  const handleScan = async () => {
+    setScanning(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/douyin/scan", { method: "POST" });
+      const data = await res.json();
+      setMessage(`扫描完成：检查了 ${data.total} 个博主，发现 ${data.totalNewWorks} 条新作品`);
+    } catch {
+      setMessage("扫描失败");
+    }
+    setScanning(false);
+  };
+
+  const handleTranscribe = async () => {
+    setTranscribing(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/douyin/transcribe", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`转写完成：共 ${data.total} 条，成功 ${data.done} 条${data.failed > 0 ? `，失败 ${data.failed} 条` : ""}`);
+      } else {
+        setMessage(`转写失败: ${data.error}`);
+      }
+    } catch {
+      setMessage("转写请求失败");
+    }
+    setTranscribing(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">设置</h1>
         <p className="text-muted-foreground mt-1">
-          管理主题偏好、通知与数据源配置
+          管理主题偏好与抖音雷达配置
         </p>
       </div>
 
-      {/* Theme setting */}
+      {/* 外观设置 */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-medium">主题偏好</CardTitle>
@@ -37,14 +148,115 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Placeholder */}
-      <Card className="flex items-center justify-center min-h-[200px] border-dashed">
-        <CardContent className="text-center py-12">
-          <Settings className="mx-auto h-12 w-12 text-muted-foreground/40" />
-          <p className="mt-4 text-lg text-muted-foreground">更多设置即将上线</p>
-          <p className="mt-1 text-sm text-muted-foreground/60">
-            通知管理、API Key 配置、数据源设置等功能将在后续版本添加
-          </p>
+      {/* 抖音雷达管理 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Radio className="h-4 w-4" />
+            抖音雷达管理
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* 添加博主 */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground">添加博主</h3>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={uidInput}
+                onChange={(e) => setUidInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                placeholder="输入抖音博主 sec_uid..."
+                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <select
+                value={categorySelect}
+                onChange={(e) => setCategorySelect(e.target.value as "predictor" | "technical")}
+                className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="predictor">预测类</option>
+                <option value="technical">技术类</option>
+              </select>
+              <Button onClick={handleAdd} disabled={adding || !uidInput.trim()}>
+                {adding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                添加
+              </Button>
+            </div>
+          </div>
+
+          {/* 已添加博主列表 */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground">已添加博主</h3>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">加载中...</p>
+            ) : bloggers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">暂无博主</p>
+            ) : (
+              <div className="space-y-2">
+                {bloggers.map((blogger) => {
+                  const cat = categoryLabels[blogger.category] || categoryLabels.predictor;
+                  return (
+                    <div
+                      key={blogger.id}
+                      className="flex items-center gap-3 rounded-md border p-3"
+                    >
+                      {blogger.avatarUrl ? (
+                        <img src={blogger.avatarUrl} alt={blogger.nickname}
+                          className="h-8 w-8 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-muted shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{blogger.nickname}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {blogger.followerCount.toLocaleString()} 粉丝
+                        </p>
+                      </div>
+                      <Badge variant={cat.variant} className="shrink-0 text-xs">
+                        {cat.label}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500 shrink-0"
+                        onClick={() => handleDelete(blogger.id, blogger.nickname)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 操作区 */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground">操作</h3>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleScan} disabled={scanning}>
+                {scanning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                扫描全部博主
+              </Button>
+              <Button variant="outline" onClick={handleTranscribe} disabled={transcribing}>
+                {transcribing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mic className="h-4 w-4 mr-2" />}
+                开始转写
+              </Button>
+            </div>
+          </div>
+
+          {/* 反馈消息 */}
+          {message && (
+            <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">{message}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 更多设置占位 */}
+      <Card className="flex items-center justify-center min-h-[100px] border-dashed">
+        <CardContent className="text-center py-8">
+          <Settings className="mx-auto h-8 w-8 text-muted-foreground/40" />
+          <p className="mt-2 text-sm text-muted-foreground">更多设置即将上线</p>
         </CardContent>
       </Card>
     </div>
