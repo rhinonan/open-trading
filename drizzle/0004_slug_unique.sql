@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `bloggers_slug_unique` ON `bloggers` (`slug`);

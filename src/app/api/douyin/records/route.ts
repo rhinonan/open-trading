@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const evalDate = searchParams.get("eval_date");
 
   try {
-    let query = db
+    const query = db
       .select({
         evaluation: evaluations,
         items: predictionItems,
@@ -24,14 +24,16 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(evaluations.evalDate))
       .$dynamic();
 
-    if (bloggerSlug) {
-      query = query.where(eq(bloggers.slug, bloggerSlug));
-    }
-    if (evalDate) {
-      query = query.where(eq(evaluations.evalDate, evalDate));
-    }
+    const conditions = [];
+    if (bloggerSlug) conditions.push(eq(bloggers.slug, bloggerSlug));
+    if (evalDate) conditions.push(eq(evaluations.evalDate, evalDate));
 
-    const rows = await query;
+    const rows =
+      conditions.length > 0
+        ? await query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions)
+          )
+        : await query;
 
     // Group by evaluation
     const grouped = new Map<number, any>();

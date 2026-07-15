@@ -4,9 +4,8 @@ import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Loader2, X, Play, ImageIcon } from "lucide-react";
+import { ArrowLeft, X, Play, ImageIcon } from "lucide-react";
 import type {
   DouyinBlogger,
   DouyinEvaluation,
@@ -416,7 +415,7 @@ export default function BloggerDetailPage({
                     {evaluation.items.length > 0 && (
                       <div className="space-y-3">
                         {evaluation.items.map((item) => {
-                          const jConfig = JUDGMENT_CONFIG[item.judgment];
+                          const jConfig = JUDGMENT_CONFIG[item.judgment] ?? JUDGMENT_CONFIG.not_applicable;
                           return (
                             <div
                               key={item.id}

@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 export const bloggers = sqliteTable("bloggers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  slug: text("slug").notNull().default(""),
+  slug: text("slug").notNull().unique().default(""),
   douyinUid: text("douyin_uid").notNull().unique(),
   nickname: text("nickname").notNull(),
   avatarUrl: text("avatar_url").notNull().default(""),

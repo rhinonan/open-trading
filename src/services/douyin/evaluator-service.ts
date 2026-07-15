@@ -17,8 +17,6 @@
 //   not_applicable   — 视频内容不涉及行情预测或无法判断
 // ============================================================================
 
-import type { JudgmentResult } from "@/types";
-
 export interface EvaluationResult {
   bloggerId: number;
   nickname: string;

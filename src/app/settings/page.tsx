@@ -62,10 +62,10 @@ export default function SettingsPage() {
     setAdding(false);
   };
 
-  const handleDelete = async (id: number, nickname: string) => {
+  const handleDelete = async (slug: string, nickname: string) => {
     if (!confirm(`确定要删除博主「${nickname}」吗？相关作品和评判记录将一并删除。`)) return;
     try {
-      const res = await fetch(`/api/douyin/bloggers/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/douyin/bloggers/${slug}`, { method: "DELETE" });
       if (res.ok) {
         setMessage(`已删除 ${nickname}`);
         fetchBloggers();
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-red-500 shrink-0"
-                        onClick={() => handleDelete(blogger.id, blogger.nickname)}
+                        onClick={() => handleDelete(blogger.slug, blogger.nickname)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
