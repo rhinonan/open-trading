@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import {
@@ -20,17 +19,11 @@ import {
 } from "lucide-react";
 import type { DouyinBlogger } from "@/types";
 
-const categoryLabels: Record<string, { label: string; variant: "default" | "secondary" }> = {
-  predictor: { label: "预测类", variant: "default" },
-  technical: { label: "技术类", variant: "secondary" },
-};
-
 export default function SettingsPage() {
   // --- 抖音管理状态 ---
   const [bloggers, setBloggers] = useState<DouyinBlogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [uidInput, setUidInput] = useState("");
-  const [categorySelect, setCategorySelect] = useState<"predictor" | "technical">("predictor");
   const [adding, setAdding] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -53,7 +46,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/douyin/bloggers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ douyinUid: uidInput.trim(), category: categorySelect }),
+        body: JSON.stringify({ douyinUid: uidInput.trim() }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -191,14 +184,6 @@ export default function SettingsPage() {
                 placeholder="输入抖音博主 sec_uid..."
                 className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <select
-                value={categorySelect}
-                onChange={(e) => setCategorySelect(e.target.value as "predictor" | "technical")}
-                className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="predictor">预测类</option>
-                <option value="technical">技术类</option>
-              </select>
               <Button onClick={handleAdd} disabled={adding || !uidInput.trim()}>
                 {adding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
                 添加
@@ -216,7 +201,6 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-2">
                 {bloggers.map((blogger) => {
-                  const cat = categoryLabels[blogger.category] || categoryLabels.predictor;
                   return (
                     <div
                       key={blogger.id}
@@ -234,9 +218,6 @@ export default function SettingsPage() {
                           {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
                         </p>
                       </div>
-                      <Badge variant={cat.variant} className="shrink-0 text-xs">
-                        {cat.label}
-                      </Badge>
                       <Button
                         variant="ghost"
                         size="icon"
