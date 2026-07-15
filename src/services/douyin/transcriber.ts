@@ -126,7 +126,7 @@ function transcribeShort(audioPath: string): Promise<string> {
       }
     };
 
-    ws.onmessage = (event: MessageEvent) => {
+    ws.onmessage = (event) => {
       try {
         // event.data: 文本帧为 string，二进制帧为 Buffer（Node.js 默认 binaryType）
         const raw =

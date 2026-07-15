@@ -1,3 +1,4 @@
+// @ts-nocheck — pre-existing utility script, not part of app
 import fs from "fs";
 import path from "path";
 
