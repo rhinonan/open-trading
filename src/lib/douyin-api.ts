@@ -75,6 +75,7 @@ export interface DouyinVideoData {
   create_time: number;
   aweme_type: number;
   media_type: number; // 2=图集, 4=视频
+  is_top?: number; // 1=置顶作品（可能是很早的作品，扫描时不作为截止判断依据）
   images?: Array<{
     url_list: string[];
     width: number;

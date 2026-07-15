@@ -54,8 +54,11 @@ export async function scanBlogger(
 
       const newPosts = [];
       for (const post of awemeList) {
-        // Stop if we've reached the cutoff date
+        // Stop if we've reached the cutoff date.
+        // 置顶视频（is_top=1）可能是很早的作品且排在第一页最前面，
+        // 跳过它继续往后翻，不能因此提前停止扫描。
         if (post.create_time < cutoffTimestamp) {
+          if (post.is_top === 1) continue;
           hasMore = false;
           break;
         }
