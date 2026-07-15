@@ -121,6 +121,11 @@ export type PredictionType =
   | "sector"
   | "stock_pick";
 
+export interface DouyinBloggerWithOpinion extends DouyinBlogger {
+  latestOpinion: string;
+  latestWorkAt: number | null;
+}
+
 export interface DouyinBlogger {
   id: number;
   douyinUid: string;
