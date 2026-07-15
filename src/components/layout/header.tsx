@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 
 const BREADCRUMB_MAP: Record<string, string> = {
-  "/": "仪表盘",
+  "/": "首页",
   "/douyin": "抖音雷达",
   "/stocks": "个股分析",
   "/industry": "行业分析",
@@ -17,7 +17,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
 
 function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
   const segments = pathname.split("/").filter(Boolean);
-  const crumbs: { label: string; href: string }[] = [{ label: "仪表盘", href: "/" }];
+  const crumbs: { label: string; href: string }[] = [{ label: "首页", href: "/" }];
 
   let current = "";
   for (const seg of segments) {
