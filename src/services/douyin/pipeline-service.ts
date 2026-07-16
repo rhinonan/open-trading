@@ -2,10 +2,7 @@
 import { db } from "@/db";
 import { works } from "@/db/schema";
 import { eq, inArray, asc } from "drizzle-orm";
-import { downloadVideo } from "./video-downloader";
-import { extractAudio } from "./audio-extractor";
-import { transcribeAudio } from "./transcriber";
-import { extractOpinion } from "./opinion-service";
+import { mastra } from "@/mastra";
 
 // ============================================================
 // 类型
@@ -91,46 +88,27 @@ async function processOneWork(row: WorkRow): Promise<TaskResult> {
       .where(eq(works.id, id))
       .run();
 
-    // 3. 下载视频
-    console.log(`${logPrefix} 开始下载视频...`);
-    const videoPath = await downloadVideo(awemeId, videoUrl);
-    console.log(`${logPrefix} 视频下载完成 → ${videoPath}`);
+    // 3. 启动单作品转写 workflow（每步自动重试 2 次，运行记录持久化到 data/mastra.db）
+    const run = await mastra
+      .getWorkflow("transcribeWorkWorkflow")
+      .createRun();
+    const result = await run.start({
+      inputData: { workId: id, awemeId, videoUrl, duration },
+    });
 
-    // 4. 提取音频
-    console.log(`${logPrefix} 开始提取音频...`);
-    const audioPath = await extractAudio(videoPath, awemeId);
-    console.log(`${logPrefix} 音频提取完成 → ${audioPath}`);
-
-    // 5. ASR 转写
-    // duration=0 means unknown — default to LFASR (long audio) to be safe
-    const effectiveDuration = duration > 0 ? duration : 61_000;
-    const method = effectiveDuration / 1000 <= 60 ? "IAT (短音频)" : "LFASR (长音频)";
-    console.log(`${logPrefix} 开始语音转写 (${method}, duration=${effectiveDuration}ms)...`);
-    const transcript = await transcribeAudio(audioPath, effectiveDuration);
-    console.log(`${logPrefix} 语音转写完成 → ${transcript.length} 字符`);
-
-    // 6. 提取观点摘要
-    let opinionSummary = "";
-    try {
-      console.log(`${logPrefix} 开始提取观点摘要...`);
-      opinionSummary = await extractOpinion(transcript);
-      console.log(`${logPrefix} 观点摘要 → ${opinionSummary.slice(0, 50)}...`);
-    } catch (opinionErr) {
-      console.error(`${logPrefix} 观点提取失败（非致命）:`, opinionErr);
+    if (result.status !== "success") {
+      const errorMsg =
+        result.status === "failed"
+          ? result.error instanceof Error
+            ? result.error.message
+            : String(result.error)
+          : `workflow ended with status: ${result.status}`;
+      throw new Error(errorMsg);
     }
 
-    // 7. 回写 DB（含 transcript + opinion_summary）
-    db.update(works)
-      .set({
-        transcript,
-        transcriptStatus: "done",
-        opinionSummary,
-      })
-      .where(eq(works.id, id))
-      .run();
-
+    // done 状态与 transcript/opinionSummary 已由 workflow 末步回写 DB
     console.log(`${logPrefix} ✅ 全部完成`);
-    return { awemeId, status: "done", transcript };
+    return { awemeId, status: "done", transcript: result.result.transcript };
   } catch (err) {
     // 失败回写
     const errorMsg =
