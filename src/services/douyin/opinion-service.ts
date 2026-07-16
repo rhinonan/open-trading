@@ -1,5 +1,6 @@
 // src/services/douyin/opinion-service.ts
 import { callClaude } from "@/lib/llm";
+import { getLlmModel } from "@/services/settings-service";
 
 const SYSTEM_PROMPT = `你是一个财经内容分析师。用户会给你一段抖音博主的口播转写文本，请你用一句话（不超过80字）总结该博主的观点或判断。
 
@@ -16,10 +17,11 @@ export async function extractOpinion(transcript: string): Promise<string> {
   }
 
   try {
+    const model = await getLlmModel("opinion");
     const result = await callClaude(
       transcript.slice(0, 4000), // 限制输入长度
       SYSTEM_PROMPT,
-      { maxTokens: 200, temperature: 0.3 }
+      { model, maxTokens: 200, temperature: 0.3 }
     );
     return result.trim();
   } catch (err) {
