@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { DEFAULT_LLM_MODEL, DEFAULT_NEWAPI_BASE_URL } from "@/lib/llm-constants";
 
-export const DEFAULT_LLM_MODEL = "claude-sonnet-4-20250514";
+export { DEFAULT_LLM_MODEL } from "@/lib/llm-constants";
 
 let client: Anthropic | null = null;
 
@@ -11,7 +12,7 @@ export function getAnthropicClient(): Anthropic {
       throw new Error("NEWAPI_API_KEY environment variable is not set");
     }
     client = new Anthropic({
-      baseURL: process.env.NEWAPI_BASE_URL || "https://newapi.tdance.cc/v1",
+      baseURL: process.env.NEWAPI_BASE_URL || DEFAULT_NEWAPI_BASE_URL,
       apiKey,
     });
   }

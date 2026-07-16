@@ -1,8 +1,10 @@
 // src/app/api/llm/models/route.ts
 
+import { DEFAULT_NEWAPI_BASE_URL } from "@/lib/llm-constants";
+
 export async function GET() {
   const apiKey = process.env.NEWAPI_API_KEY;
-  const baseUrl = process.env.NEWAPI_BASE_URL || "https://newapi.tdance.cc/v1";
+  const baseUrl = process.env.NEWAPI_BASE_URL || DEFAULT_NEWAPI_BASE_URL;
 
   if (!apiKey) {
     return Response.json(

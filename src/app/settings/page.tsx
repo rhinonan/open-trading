@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Settings, Sun, Moon, Monitor, Cpu, Loader2 } from "lucide-react";
+import { DEFAULT_LLM_MODEL } from "@/lib/llm-constants";
 
 interface LlmSettings {
   opinionModel: string;
@@ -25,31 +26,34 @@ export default function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      const [modelsResult, settingsResult] = await Promise.allSettled([
-        fetch("/api/llm/models"),
-        fetch("/api/settings/llm"),
-      ]);
+      try {
+        const [modelsResult, settingsResult] = await Promise.allSettled([
+          fetch("/api/llm/models"),
+          fetch("/api/settings/llm"),
+        ]);
 
-      if (modelsResult.status === "fulfilled" && modelsResult.value.ok) {
-        const data = await modelsResult.value.json();
-        const modelList = data.models ?? [];
-        setModels(modelList);
-        if (modelList.length === 0) setModelsError("暂无可用模型");
-      } else {
-        let msg = "无法获取模型列表";
-        if (modelsResult.status === "fulfilled") {
-          try {
-            const data = await modelsResult.value.json();
-            if (data.error) msg = `无法获取模型列表: ${data.error}`;
-          } catch { /* 保留默认提示 */ }
+        if (modelsResult.status === "fulfilled" && modelsResult.value.ok) {
+          const data = await modelsResult.value.json();
+          const modelList = data.models ?? [];
+          setModels(modelList);
+          if (modelList.length === 0) setModelsError("暂无可用模型");
+        } else {
+          let msg = "无法获取模型列表";
+          if (modelsResult.status === "fulfilled") {
+            try {
+              const data = await modelsResult.value.json();
+              if (data.error) msg = `无法获取模型列表: ${data.error}`;
+            } catch { /* 保留默认提示 */ }
+          }
+          setModelsError(msg);
         }
-        setModelsError(msg);
-      }
 
-      if (settingsResult.status === "fulfilled" && settingsResult.value.ok) {
-        setLlmSettings(await settingsResult.value.json());
+        if (settingsResult.status === "fulfilled" && settingsResult.value.ok) {
+          setLlmSettings(await settingsResult.value.json());
+        }
+      } finally {
+        setLlmLoading(false);
       }
-      setLlmLoading(false);
     })();
   }, []);
 
@@ -75,6 +79,8 @@ export default function SettingsPage() {
     }
     setSaving(false);
   };
+
+  const llmError = modelsError || (!llmSettings && !llmLoading ? "无法加载模型设置" : "");
 
   return (
     <div className="space-y-6">
@@ -126,7 +132,7 @@ export default function SettingsPage() {
                   </div>
                   {modelsError || models.length === 0 || !llmSettings ? (
                     <span className="text-sm text-muted-foreground font-mono">
-                      {llmSettings?.[field] ?? "claude-sonnet-4-20250514"}
+                      {llmSettings?.[field] ?? DEFAULT_LLM_MODEL}
                     </span>
                   ) : (
                     <select
@@ -146,8 +152,8 @@ export default function SettingsPage() {
                   )}
                 </div>
               ))}
-              {(modelsError || (!llmSettings && "无法加载模型设置")) && (
-                <p className="text-sm text-red-500 bg-muted/50 rounded-md p-3">{modelsError || "无法加载模型设置"}</p>
+              {llmError && (
+                <p className="text-sm text-red-500 bg-muted/50 rounded-md p-3">{llmError}</p>
               )}
               {llmMessage && (
                 <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">{llmMessage}</p>
