@@ -2,7 +2,7 @@
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { DEFAULT_LLM_MODEL } from "@/lib/llm";
+import { DEFAULT_LLM_MODEL } from "@/lib/llm-constants";
 
 export async function getSetting(key: string): Promise<string | null> {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
