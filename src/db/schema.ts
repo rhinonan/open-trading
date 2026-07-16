@@ -76,3 +76,11 @@ export const predictionItems = sqliteTable("prediction_items", {
     .default("not_applicable"),
   relatedSymbols: text("related_symbols").notNull().default("[]"),
 });
+
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at")
+    .notNull()
+    .default(sql`(unixepoch())`),
+});

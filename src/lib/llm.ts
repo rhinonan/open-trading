@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+export const DEFAULT_LLM_MODEL = "claude-sonnet-4-20250514";
+
 let client: Anthropic | null = null;
 
 export function getAnthropicClient(): Anthropic {
@@ -30,7 +32,7 @@ export async function callClaude(
   const anthropic = getAnthropicClient();
 
   const response = await anthropic.messages.create({
-    model: options.model || "claude-sonnet-4-20250514",
+    model: options.model || DEFAULT_LLM_MODEL,
     max_tokens: options.maxTokens ?? 4096,
     temperature: options.temperature ?? 0.3,
     system: systemPrompt,
