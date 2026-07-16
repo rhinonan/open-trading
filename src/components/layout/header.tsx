@@ -13,6 +13,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/financials": "财报 & 研报",
   "/agents": "Agent 管理",
   "/settings": "设置",
+  "/settings/douyin": "抖音雷达",
 };
 
 function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
