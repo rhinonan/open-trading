@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Mastra 依赖 Node-only 模块，必须排除出打包
+  serverExternalPackages: ["@mastra/*"],
 };
 
 export default nextConfig;
