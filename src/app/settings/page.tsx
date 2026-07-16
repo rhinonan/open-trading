@@ -32,7 +32,9 @@ export default function SettingsPage() {
 
       if (modelsResult.status === "fulfilled" && modelsResult.value.ok) {
         const data = await modelsResult.value.json();
-        setModels(data.models ?? []);
+        const modelList = data.models ?? [];
+        setModels(modelList);
+        if (modelList.length === 0) setModelsError("暂无可用模型");
       } else {
         let msg = "无法获取模型列表";
         if (modelsResult.status === "fulfilled") {
@@ -122,9 +124,9 @@ export default function SettingsPage() {
                     <p className="text-sm font-medium">{label}</p>
                     <p className="text-xs text-muted-foreground">{hint}</p>
                   </div>
-                  {modelsError || models.length === 0 ? (
+                  {modelsError || models.length === 0 || !llmSettings ? (
                     <span className="text-sm text-muted-foreground font-mono">
-                      {llmSettings?.[field] ?? "-"}
+                      {llmSettings?.[field] ?? "claude-sonnet-4-20250514"}
                     </span>
                   ) : (
                     <select
@@ -144,8 +146,8 @@ export default function SettingsPage() {
                   )}
                 </div>
               ))}
-              {modelsError && (
-                <p className="text-sm text-red-500 bg-muted/50 rounded-md p-3">{modelsError}</p>
+              {(modelsError || (!llmSettings && "无法加载模型设置")) && (
+                <p className="text-sm text-red-500 bg-muted/50 rounded-md p-3">{modelsError || "无法加载模型设置"}</p>
               )}
               {llmMessage && (
                 <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">{llmMessage}</p>
