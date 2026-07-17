@@ -305,3 +305,45 @@ export async function batchOperate(
     errors,
   };
 }
+
+export async function summarizeBloggerWorks(
+  bloggerId: number
+): Promise<{ total: number; succeeded: number; failed: number }> {
+  const pendingWorks = db
+    .select({
+      id: works.id,
+      transcript: works.transcript,
+      transcriptStatus: works.transcriptStatus,
+    })
+    .from(works)
+    .where(
+      and(
+        eq(works.bloggerId, bloggerId),
+        eq(works.transcriptStatus, "done"),
+        eq(works.opinionSummary, "")
+      )
+    )
+    .all() as Array<{ id: number; transcript: string | null; transcriptStatus: string }>;
+
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const w of pendingWorks) {
+    if (!w.transcript) {
+      failed++;
+      continue;
+    }
+    try {
+      const summary = await extractOpinion(w.transcript);
+      db.update(works)
+        .set({ opinionSummary: summary })
+        .where(eq(works.id, w.id))
+        .run();
+      succeeded++;
+    } catch {
+      failed++;
+    }
+  }
+
+  return { total: pendingWorks.length, succeeded, failed };
+}
