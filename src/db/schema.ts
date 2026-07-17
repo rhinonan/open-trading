@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const bloggers = sqliteTable("bloggers", {
@@ -17,30 +17,39 @@ export const bloggers = sqliteTable("bloggers", {
     .default(sql`(unixepoch())`),
 });
 
-export const works = sqliteTable("works", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  awemeId: text("aweme_id").notNull().unique(),
-  bloggerId: integer("blogger_id")
-    .notNull()
-    .references(() => bloggers.id, { onDelete: "cascade" }),
-  desc: text("desc").notNull().default(""),
-  videoUrl: text("video_url"),
-  transcript: text("transcript"),
-  transcriptStatus: text("transcript_status", {
-    enum: ["pending", "processing", "done", "failed"],
-  })
-    .notNull()
-    .default("pending"),
-  duration: integer("duration").notNull().default(0),
-  opinionSummary: text("opinion_summary").notNull().default(""),
-  coverUrl: text("cover_url").notNull().default(""),
-  shareUrl: text("share_url").notNull().default(""),
-  statistics: text("statistics").notNull().default("{}"),
-  publishedAt: integer("published_at").notNull(),
-  scannedAt: integer("scanned_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
+export const works = sqliteTable(
+  "works",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    awemeId: text("aweme_id").notNull().unique(),
+    bloggerId: integer("blogger_id")
+      .notNull()
+      .references(() => bloggers.id, { onDelete: "cascade" }),
+    desc: text("desc").notNull().default(""),
+    videoUrl: text("video_url"),
+    transcript: text("transcript"),
+    transcriptStatus: text("transcript_status", {
+      enum: ["pending", "processing", "done", "failed"],
+    })
+      .notNull()
+      .default("pending"),
+    duration: integer("duration").notNull().default(0),
+    opinionSummary: text("opinion_summary").notNull().default(""),
+    coverUrl: text("cover_url").notNull().default(""),
+    shareUrl: text("share_url").notNull().default(""),
+    statistics: text("statistics").notNull().default("{}"),
+    publishedAt: integer("published_at").notNull(),
+    scannedAt: integer("scanned_at")
+      .notNull()
+      .default(sql`(unixepoch())`),
+    // 最近一次被 runner 认领的时刻（unixepoch 秒）；null = 从未认领
+    claimedAt: integer("claimed_at"),
+  },
+  (t) => [
+    index("works_blogger_id_idx").on(t.bloggerId),
+    index("works_transcript_status_idx").on(t.transcriptStatus),
+  ]
+);
 
 export const evaluations = sqliteTable("evaluations", {
   id: integer("id").primaryKey({ autoIncrement: true }),

@@ -10,3 +10,6 @@ sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
+
+// 供服务层做依赖注入（测试传内存库）
+export type Db = typeof db;
