@@ -101,6 +101,7 @@ export async function updateBloggerProfile(
       avatarUrl: avatar,
       signature: profile.signature || "",
       followerCount: profile.follower_count || 0,
+      updatedAt: Math.floor(Date.now() / 1000),
     })
     .where(eq(bloggers.slug, slug))
     .returning()

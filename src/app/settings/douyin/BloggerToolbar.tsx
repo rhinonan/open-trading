@@ -94,7 +94,7 @@ export function BloggerToolbar({
           variant="outline"
           size="sm"
           onClick={() => handleClick("update-profile")}
-          disabled={isProcessing("update-profile")}
+          disabled={processingAction !== null}
         >
           {isProcessing("update-profile") ? (
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -109,7 +109,7 @@ export function BloggerToolbar({
           variant="outline"
           size="sm"
           onClick={() => handleClick("scan")}
-          disabled={isProcessing("scan")}
+          disabled={processingAction !== null}
         >
           {isProcessing("scan") ? (
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -124,7 +124,7 @@ export function BloggerToolbar({
           variant="outline"
           size="sm"
           onClick={() => handleClick("transcribe")}
-          disabled={isProcessing("transcribe")}
+          disabled={processingAction !== null}
         >
           {isProcessing("transcribe") ? (
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -139,7 +139,7 @@ export function BloggerToolbar({
           variant="outline"
           size="sm"
           onClick={() => handleClick("summarize")}
-          disabled={isProcessing("summarize")}
+          disabled={processingAction !== null}
         >
           {isProcessing("summarize") ? (
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -151,18 +151,16 @@ export function BloggerToolbar({
 
         {/* 评判 — 置灰 */}
         <Tooltip>
-          <TooltipTrigger>
-            <span className="inline-flex">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                className="opacity-50 cursor-not-allowed"
-              >
-                <BarChart3 className="h-4 w-4 mr-1.5" />
-                评判
-              </Button>
-            </span>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="opacity-50 cursor-not-allowed"
+            >
+              <BarChart3 className="h-4 w-4 mr-1.5" />
+              评判
+            </Button>
           </TooltipTrigger>
           <TooltipContent>
             ASR 流水线就绪后启用

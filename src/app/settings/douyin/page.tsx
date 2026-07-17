@@ -191,6 +191,7 @@ export default function DouyinSettingsPage() {
   };
 
   const handleToolbarAction = async (action: ToolbarAction) => {
+    if (processingAction) return;
     setMessage("");
     setProcessingAction(action);
 
