@@ -43,3 +43,6 @@ next-env.d.ts
 
 # runtime data (database, cache, media files)
 /data/
+
+# claude code - personal settings
+.claude/settings.local.json
