@@ -1,6 +1,6 @@
 // src/services/douyin/works-service.ts
 import { db } from "@/db";
-import { works, bloggers, evaluations, predictionItems } from "@/db/schema";
+import { works, bloggers, predictionItems } from "@/db/schema";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
 import { mastra } from "@/mastra";
 import { extractOpinion } from "@/services/douyin/opinion-service";
