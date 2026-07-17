@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       search: searchParams.get("search") || undefined,
       page: parseInt(searchParams.get("page") || "0", 10) || 0,
       perPage: Math.min(
-        50,
+        200,
         parseInt(searchParams.get("perPage") || "20", 10) || 20
       ),
     };

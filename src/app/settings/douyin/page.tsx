@@ -54,6 +54,10 @@ export default function DouyinSettingsPage() {
         // Client-side pagination for bloggers
         setBloggers(data);
         setBloggerTotal(data.length);
+        // Clamp page into valid range in case the list shrank (e.g. after delete)
+        setBloggerPage((p) =>
+          Math.min(p, Math.max(0, Math.ceil(data.length / BLOGGERS_PER_PAGE) - 1))
+        );
       }
     } catch {}
     setLoadingBloggers(false);
@@ -110,13 +114,23 @@ export default function DouyinSettingsPage() {
 
   // --- Delete ---
   const handleDelete = async (slug: string) => {
+    const deletedId = bloggers.find((b) => b.slug === slug)?.id;
     try {
       const res = await fetch(`/api/douyin/bloggers/${slug}`, { method: "DELETE" });
       if (res.ok) {
         setMessage("博主已删除");
+        if (deletedId !== undefined) {
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(deletedId);
+            return next;
+          });
+        }
         setExpandedId(null);
         setWorksCache({});
         fetchBloggers();
+      } else {
+        setMessage("删除失败");
       }
     } catch {
       setMessage("删除失败");

@@ -8,11 +8,12 @@ import type {
   WorkWithBlogger,
   WorksFilter,
   WorksResponse,
-  FilterCounts,
+  TranscriptStatus,
+  JudgmentResult,
 } from "@/types";
 
 const DEFAULT_PER_PAGE = 20;
-const MAX_PER_PAGE = 50;
+const MAX_PER_PAGE = 200;
 
 export async function queryWorks(
   filter: WorksFilter
@@ -38,7 +39,7 @@ export async function queryWorks(
   }
 
   if (filter.transcriptStatus) {
-    conditions.push(eq(works.transcriptStatus, filter.transcriptStatus as any));
+    conditions.push(eq(works.transcriptStatus, filter.transcriptStatus as TranscriptStatus));
   }
 
   if (filter.search) {
@@ -54,7 +55,7 @@ export async function queryWorks(
     .where(and(...conditions));
 
   // judgement 过滤：通过 prediction_items 子查询
-  let totalQuery: any;
+  let totalQuery: { get: () => { count: number } | undefined };
   if (filter.judgment) {
     totalQuery = db
       .select({ count: sql<number>`count(distinct ${works.id})` })
@@ -63,13 +64,13 @@ export async function queryWorks(
       .where(
         and(
           ...conditions,
-          eq(predictionItems.judgment, filter.judgment as any)
+          eq(predictionItems.judgment, filter.judgment as JudgmentResult)
         )
       );
   } else {
     totalQuery = baseQuery;
   }
-  const totalRow = totalQuery.get() as { count: number };
+  const totalRow = totalQuery.get();
   const total = totalRow?.count ?? 0;
 
   // 查询数据
@@ -103,7 +104,7 @@ export async function queryWorks(
       filter.judgment
         ? and(
             ...conditions,
-            eq(predictionItems.judgment, filter.judgment as any)
+            eq(predictionItems.judgment, filter.judgment as JudgmentResult)
           )
         : and(...conditions)
     )
@@ -115,7 +116,7 @@ export async function queryWorks(
     .offset(page * perPage)
     .all();
 
-  const enriched: WorkWithBlogger[] = rows.map((row: any) => ({
+  const enriched: WorkWithBlogger[] = rows.map((row) => ({
     id: row.id,
     awemeId: row.awemeId,
     desc: row.desc,
@@ -194,7 +195,7 @@ export async function transcribeWork(workId: number): Promise<{ success: boolean
     })
     .from(works)
     .where(eq(works.id, workId))
-    .get() as any;
+    .get();
 
   if (!work) {
     return { success: false, error: "作品不存在" };
@@ -251,7 +252,7 @@ export async function summarizeWork(workId: number): Promise<{ success: boolean;
     })
     .from(works)
     .where(eq(works.id, workId))
-    .get() as any;
+    .get();
 
   if (!work) {
     return { success: false, error: "作品不存在" };
