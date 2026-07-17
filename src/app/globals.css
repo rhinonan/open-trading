@@ -136,3 +136,20 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  /* 卡片柔和阴影 — 用于对话区和面板卡片 */
+  .card-elevated {
+    box-shadow: var(--card-glow);
+    border-color: var(--card-ring);
+  }
+
+  /* PromptInput 聚焦光晕 */
+  .prompt-focus-ring:focus-within {
+    box-shadow: 0 0 0 3px oklch(0.546 0.245 262.881 / 20%);
+  }
+}
+
+.dark .prompt-focus-ring:focus-within {
+  box-shadow: 0 0 0 3px oklch(0.623 0.214 259.815 / 30%);
+}
