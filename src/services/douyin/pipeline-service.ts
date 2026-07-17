@@ -1,7 +1,7 @@
 // src/services/douyin/pipeline-service.ts
 import { db } from "@/db";
 import { works } from "@/db/schema";
-import { eq, inArray, asc } from "drizzle-orm";
+import { eq, inArray, asc, and } from "drizzle-orm";
 import { mastra } from "@/mastra";
 
 // ============================================================
@@ -183,4 +183,54 @@ export async function transcribePendingWorks(
     failed,
     results,
   };
+}
+
+export async function transcribeBloggerWorks(
+  bloggerId: number,
+  config?: Partial<PipelineConfig>
+): Promise<PipelineResult> {
+  const concurrency = config?.concurrency ?? 2;
+  const maxTasks = config?.maxTasks ?? 20;
+
+  const pending = db
+    .select({
+      id: works.id,
+      awemeId: works.awemeId,
+      videoUrl: works.videoUrl,
+      duration: works.duration,
+    })
+    .from(works)
+    .where(
+      and(
+        eq(works.bloggerId, bloggerId),
+        inArray(works.transcriptStatus, ["pending", "processing", "failed"])
+      )
+    )
+    .orderBy(asc(works.scannedAt))
+    .limit(maxTasks)
+    .all() as WorkRow[];
+
+  if (pending.length === 0) {
+    return { total: 0, done: 0, failed: 0, results: [] };
+  }
+
+  const sem = new Semaphore(concurrency);
+  const results: TaskResult[] = [];
+
+  const tasks = pending.map((row) => async () => {
+    await sem.acquire();
+    try {
+      const result = await processOneWork(row);
+      results.push(result);
+    } finally {
+      sem.release();
+    }
+  });
+
+  await Promise.all(tasks.map((t) => t()));
+
+  const done = results.filter((r) => r.status === "done").length;
+  const failed = results.filter((r) => r.status === "failed").length;
+
+  return { total: results.length, done, failed, results };
 }
