@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { MessageSquare } from "lucide-react";
 import {
   Conversation,
@@ -27,7 +28,9 @@ interface AgentChatProps {
 
 export function AgentChat({ agentKey }: AgentChatProps) {
   const { messages, sendMessage, status } = useChat({
-    api: `/api/chat?agentKey=${agentKey}`,
+    transport: new DefaultChatTransport({
+      api: `/api/chat?agentKey=${agentKey}`,
+    }),
   });
 
   const handleSubmit = (message: { text: string }) => {
