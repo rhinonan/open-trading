@@ -111,6 +111,18 @@ export default function DouyinSettingsPage() {
     setSelectedIds(new Set());
   }, []);
 
+  // Page change handler: clears cross-page selection (spec §3.6)
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      setPage(newPage);
+      if (selectedIds.size > 0) {
+        setSelectedIds(new Set());
+        setMessage("已清空跨页选择");
+      }
+    },
+    [selectedIds]
+  );
+
   // Selection handlers
   const handleToggle = (id: number) => {
     setSelectedIds((prev) => {
@@ -181,9 +193,13 @@ export default function DouyinSettingsPage() {
         }),
       });
       const data = await res.json();
-      setMessage(`批量转写完成: ${data.succeeded} 成功, ${data.failed} 失败`);
-      setSelectedIds(new Set());
-      fetchWorks();
+      if (res.ok) {
+        setMessage(`批量转写完成: ${data.succeeded} 成功, ${data.failed} 失败`);
+        setSelectedIds(new Set());
+        fetchWorks();
+      } else {
+        setMessage(`批量转写失败: ${data.error}`);
+      }
     } catch {
       setMessage("批量转写请求失败");
     }
@@ -201,9 +217,13 @@ export default function DouyinSettingsPage() {
         }),
       });
       const data = await res.json();
-      setMessage(`批量提取完成: ${data.succeeded} 成功, ${data.failed} 失败`);
-      setSelectedIds(new Set());
-      fetchWorks();
+      if (res.ok) {
+        setMessage(`批量提取完成: ${data.succeeded} 成功, ${data.failed} 失败`);
+        setSelectedIds(new Set());
+        fetchWorks();
+      } else {
+        setMessage(`批量提取失败: ${data.error}`);
+      }
     } catch {
       setMessage("批量提取请求失败");
     }
@@ -342,7 +362,7 @@ export default function DouyinSettingsPage() {
           onToggleAll={handleToggleAll}
           onTranscribe={handleTranscribe}
           onSummarize={handleSummarize}
-          onPageChange={setPage}
+          onPageChange={handlePageChange}
           loading={loading}
         />
       </CardContent>

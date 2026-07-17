@@ -107,6 +107,9 @@ export async function queryWorks(
           )
         : and(...conditions)
     )
+    // Dedup: LEFT JOIN on predictionItems can yield multiple rows per work;
+    // SQLite picks one joined row per group, keeping pagination correct.
+    .groupBy(works.id)
     .orderBy(desc(works.publishedAt))
     .limit(perPage)
     .offset(page * perPage)
