@@ -71,3 +71,40 @@ export async function addBlogger(douyinUid: string): Promise<DouyinBlogger> {
 export async function deleteBlogger(id: number): Promise<void> {
   db.delete(bloggers).where(eq(bloggers.id, id)).run();
 }
+
+export async function updateBloggerProfile(
+  slug: string
+): Promise<DouyinBlogger> {
+  const blogger = db
+    .select()
+    .from(bloggers)
+    .where(eq(bloggers.slug, slug))
+    .get() as DouyinBlogger | undefined;
+  if (!blogger) throw new Error(`博主 ${slug} 不存在`);
+
+  const profile = await fetchUserProfile(blogger.douyinUid);
+  if (!profile) throw new Error(`无法获取博主 ${blogger.douyinUid} 的信息`);
+
+  const pickAvatarUrl = (urls?: string[]): string => {
+    if (!urls?.length) return "";
+    return urls.find((u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u)) || urls[0];
+  };
+  const avatar =
+    pickAvatarUrl(profile.avatar_medium?.url_list) ||
+    pickAvatarUrl(profile.avatar_thumb?.url_list) ||
+    "";
+
+  const updated = db
+    .update(bloggers)
+    .set({
+      nickname: profile.nickname || "",
+      avatarUrl: avatar,
+      signature: profile.signature || "",
+      followerCount: profile.follower_count || 0,
+    })
+    .where(eq(bloggers.slug, slug))
+    .returning()
+    .get() as DouyinBlogger;
+
+  return updated;
+}
