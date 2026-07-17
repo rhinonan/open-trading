@@ -1,6 +1,15 @@
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDownIcon } from "lucide-react";
 import type { DouyinBlogger, FilterCounts } from "@/types";
 import { useState, useEffect } from "react";
 
@@ -43,7 +52,30 @@ export function FilterBar({
   onBatchSummarize: () => void;
 }) {
   const [searchInput, setSearchInput] = useState(filters.search);
-  const [bloggerOpen, setBloggerOpen] = useState(false);
+
+  const selectedSlugs = filters.bloggerSlugs;
+  const allSelected = bloggers.length > 0 && selectedSlugs.length === bloggers.length;
+
+  const bloggerTriggerLabel =
+    selectedSlugs.length === 0
+      ? "👤 全部博主"
+      : selectedSlugs.length === 1
+        ? bloggers.find((b) => b.slug === selectedSlugs[0])?.nickname || "..."
+        : `${selectedSlugs.length} 位博主`;
+
+  const toggleBlogger = (slug: string, checked: boolean) => {
+    const next = checked
+      ? [...selectedSlugs, slug]
+      : selectedSlugs.filter((s) => s !== slug);
+    onFilterChange("bloggerSlugs", next.join(","));
+  };
+
+  const toggleSelectAll = () => {
+    onFilterChange(
+      "bloggerSlugs",
+      allSelected ? "" : bloggers.map((b) => b.slug).join(",")
+    );
+  };
 
   // 防抖搜索
   useEffect(() => {
@@ -59,28 +91,28 @@ export function FilterBar({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         {/* Blogger multi-select */}
-        <Select
-          value={filters.bloggerSlugs[0] || ""}
-          onValueChange={(v: string | null) => onFilterChange("bloggerSlugs", v ?? "")}
-          open={bloggerOpen}
-          onOpenChange={setBloggerOpen}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue>
-              {filters.bloggerSlugs.length === 0
-                ? "👤 全部博主"
-                : `${bloggers.find((b) => b.slug === filters.bloggerSlugs[0])?.nickname || "..."}`}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">全部博主</SelectItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-8 w-[160px] items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50">
+            <span className="truncate">{bloggerTriggerLabel}</span>
+            <ChevronDownIcon className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-auto min-w-(--anchor-width)">
+            <DropdownMenuItem closeOnClick={false} onClick={toggleSelectAll}>
+              {allSelected ? "取消全选" : "全选"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {bloggers.map((b) => (
-              <SelectItem key={b.slug} value={b.slug}>
+              <DropdownMenuCheckboxItem
+                key={b.slug}
+                checked={selectedSlugs.includes(b.slug)}
+                onCheckedChange={(checked: boolean) => toggleBlogger(b.slug, checked)}
+                closeOnClick={false}
+              >
                 {b.nickname} ({(b.followerCount ?? 0).toLocaleString()}粉)
-              </SelectItem>
+              </DropdownMenuCheckboxItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Transcript status */}
         <Select

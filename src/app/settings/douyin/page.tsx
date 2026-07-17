@@ -95,7 +95,7 @@ export default function DouyinSettingsPage() {
   const handleFilterChange = useCallback((key: string, value: string) => {
     switch (key) {
       case "bloggerSlugs":
-        setBloggerSlugs(value ? [value] : []);
+        setBloggerSlugs(value ? value.split(",") : []);
         break;
       case "transcriptStatus":
         setTranscriptStatus(value);
