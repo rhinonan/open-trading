@@ -191,3 +191,54 @@ export interface MarketSnapshot {
   topSectors: Array<{ name: string; changePercent: number }>;
   bottomSectors: Array<{ name: string; changePercent: number }>;
 }
+
+// ==================== 抖音管理表格 ====================
+
+export interface WorkWithBlogger {
+  id: number;
+  awemeId: string;
+  desc: string;
+  coverUrl: string;
+  duration: number;
+  statistics: string;
+  publishedAt: number;
+  transcriptStatus: TranscriptStatus;
+  transcript: string | null;
+  opinionSummary: string;
+  blogger: {
+    id: number;
+    slug: string;
+    nickname: string;
+    avatarUrl: string;
+    followerCount: number;
+  };
+  judgment: {
+    judgment: JudgmentResult;
+    predictedContent: string;
+  } | null;
+  evaluationId: number | null;
+}
+
+export interface WorksFilter {
+  bloggerSlugs?: string[];
+  transcriptStatus?: string;
+  judgment?: string;
+  search?: string;
+  page: number;
+  perPage: number;
+}
+
+export interface FilterCounts {
+  transcriptStatus: Record<string, number>;
+  judgment: Record<string, number>;
+}
+
+export interface WorksResponse {
+  works: WorkWithBlogger[];
+  total: number;
+  page: number;
+  perPage: number;
+  filterCounts: FilterCounts;
+}
+
+export type BatchAction = "transcribe" | "summarize";
