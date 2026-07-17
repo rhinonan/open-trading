@@ -1,130 +1,100 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Radio } from "lucide-react";
 import {
-  Radio,
-  RefreshCw,
-  Mic,
-  Loader2,
-  BarChart3,
-  UserPlus,
-} from "lucide-react";
-import { FilterBar } from "./FilterBar";
-import { WorksTable } from "./WorksTable";
-import { AddBloggerDialog } from "./AddBloggerDialog";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { BloggerToolbar } from "./BloggerToolbar";
+import { BloggerTable } from "./BloggerTable";
 import type {
   DouyinBlogger,
   WorkWithBlogger,
   WorksResponse,
 } from "@/types";
 
+type ToolbarAction =
+  | "update-profile"
+  | "scan"
+  | "transcribe"
+  | "summarize"
+  | "evaluate";
+
+const BLOGGERS_PER_PAGE = 15;
+
 export default function DouyinSettingsPage() {
-  // Data state
+  // --- Blogger state ---
   const [bloggers, setBloggers] = useState<DouyinBlogger[]>([]);
-  const [works, setWorks] = useState<WorkWithBlogger[]>([]);
-  const [total, setTotal] = useState(0);
-  const [filterCounts, setFilterCounts] = useState<WorksResponse["filterCounts"] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [bloggerTotal, setBloggerTotal] = useState(0);
+  const [bloggerPage, setBloggerPage] = useState(0);
+  const [loadingBloggers, setLoadingBloggers] = useState(true);
 
-  // Filter state
-  const [bloggerSlugs, setBloggerSlugs] = useState<string[]>([]);
-  const [transcriptStatus, setTranscriptStatus] = useState("");
-  const [judgment, setJudgment] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
-  const perPage = 20;
-
-  // Selection state
+  // --- Selection state ---
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  // Operation state
-  const [scanning, setScanning] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [evaluating, setEvaluating] = useState(false);
+  // --- Expand state (accordion: one at a time) ---
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [worksCache, setWorksCache] = useState<Record<number, WorkWithBlogger[]>>({});
+  const [loadingWorks, setLoadingWorks] = useState(false);
+
+  // --- Processing state ---
+  const [processingAction, setProcessingAction] = useState<ToolbarAction | null>(null);
   const [message, setMessage] = useState("");
 
-  // Dialog state
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-
-  // Fetch bloggers for filter dropdown
+  // --- Fetch bloggers ---
   const fetchBloggers = useCallback(async () => {
+    setLoadingBloggers(true);
     try {
-      const res = await fetch("/api/douyin/bloggers");
-      if (res.ok) setBloggers(await res.json());
-    } catch {}
-  }, []);
-
-  // Fetch works
-  const fetchWorks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (bloggerSlugs.length > 0) params.set("blogger_slugs", bloggerSlugs.join(","));
-      if (transcriptStatus) params.set("transcript_status", transcriptStatus);
-      if (judgment) params.set("judgment", judgment);
-      if (search) params.set("search", search);
-      params.set("page", String(page));
-      params.set("perPage", String(perPage));
-
-      const res = await fetch(`/api/douyin/works?${params}`);
+      const res = await fetch("/api/douyin/bloggers?include=latest_opinion");
       if (res.ok) {
-        const data: WorksResponse = await res.json();
-        setWorks(data.works);
-        setTotal(data.total);
-        setFilterCounts(data.filterCounts);
+        const data = await res.json();
+        // Client-side pagination for bloggers
+        setBloggers(data);
+        setBloggerTotal(data.length);
       }
     } catch {}
-    setLoading(false);
-  }, [bloggerSlugs, transcriptStatus, judgment, search, page]);
+    setLoadingBloggers(false);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-then-setState data loading
     fetchBloggers();
   }, [fetchBloggers]);
 
+  // --- Fetch works for expanded blogger ---
   useEffect(() => {
+    if (expandedId === null) return;
+    const blogger = bloggers.find((b) => b.id === expandedId);
+    if (!blogger) return;
+
+    // Skip if already cached
+    if (worksCache[expandedId]) return;
+
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-then-setState data loading
-    fetchWorks();
-  }, [fetchWorks]);
+    setLoadingWorks(true);
+    const fetchWorksForBlogger = async () => {
+      try {
+        const res = await fetch(
+          `/api/douyin/works?blogger_slugs=${blogger.slug}&perPage=200`
+        );
+        if (res.ok) {
+          const data: WorksResponse = await res.json();
+          setWorksCache((prev) => ({
+            ...prev,
+            [expandedId]: data.works,
+          }));
+        }
+      } catch {}
+      setLoadingWorks(false);
+    };
+    fetchWorksForBlogger();
+  }, [expandedId, bloggers, worksCache]);
 
-  // Filter change handler (stable identity so FilterBar's debounce timer
-  // isn't reset by unrelated parent re-renders). Also resets pagination and
-  // selection whenever any filter changes.
-  const handleFilterChange = useCallback((key: string, value: string) => {
-    switch (key) {
-      case "bloggerSlugs":
-        setBloggerSlugs(value ? value.split(",") : []);
-        break;
-      case "transcriptStatus":
-        setTranscriptStatus(value);
-        break;
-      case "judgment":
-        setJudgment(value);
-        break;
-      case "search":
-        setSearch(value);
-        break;
-    }
-    setPage(0);
-    setSelectedIds(new Set());
-  }, []);
-
-  // Page change handler: clears cross-page selection (spec §3.6)
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      setPage(newPage);
-      if (selectedIds.size > 0) {
-        setSelectedIds(new Set());
-        setMessage("已清空跨页选择");
-      }
-    },
-    [selectedIds]
-  );
-
-  // Selection handlers
-  const handleToggle = (id: number) => {
+  // --- Selection ---
+  const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -133,29 +103,42 @@ export default function DouyinSettingsPage() {
     });
   };
 
-  const handleToggleAll = (allIds: number[]) => {
-    setSelectedIds((prev) => {
-      if (allIds.every((id) => prev.has(id))) {
-        // Deselect all on current page
-        const next = new Set(prev);
-        allIds.forEach((id) => next.delete(id));
-        return next;
-      } else {
-        // Select all on current page
-        return new Set([...prev, ...allIds]);
-      }
-    });
+  // --- Expand ---
+  const handleExpand = (id: number | null) => {
+    setExpandedId(id);
   };
 
-  // Single work operations
+  // --- Delete ---
+  const handleDelete = async (slug: string) => {
+    try {
+      const res = await fetch(`/api/douyin/bloggers/${slug}`, { method: "DELETE" });
+      if (res.ok) {
+        setMessage("博主已删除");
+        setExpandedId(null);
+        setWorksCache({});
+        fetchBloggers();
+      }
+    } catch {
+      setMessage("删除失败");
+    }
+  };
+
+  // --- Single video operations ---
   const handleTranscribe = async (workId: number) => {
     setMessage("");
     try {
       const res = await fetch(`/api/douyin/works/${workId}/transcribe`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        setMessage(`转写任务已启动`);
-        fetchWorks();
+        setMessage("转写任务已启动");
+        // Invalidate cache for the expanded blogger to refresh
+        if (expandedId) {
+          setWorksCache((prev) => {
+            const next = { ...prev };
+            delete next[expandedId];
+            return next;
+          });
+        }
       } else {
         setMessage(`转写失败: ${data.error}`);
       }
@@ -170,8 +153,14 @@ export default function DouyinSettingsPage() {
       const res = await fetch(`/api/douyin/works/${workId}/summarize`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        setMessage(`观点已提取: ${data.summary?.slice(0, 50)}...`);
-        fetchWorks();
+        setMessage("观点已提取");
+        if (expandedId) {
+          setWorksCache((prev) => {
+            const next = { ...prev };
+            delete next[expandedId];
+            return next;
+          });
+        }
       } else {
         setMessage(`观点提取失败: ${data.error}`);
       }
@@ -180,108 +169,98 @@ export default function DouyinSettingsPage() {
     }
   };
 
-  // Batch operations
-  const handleBatchTranscribe = async () => {
-    setMessage("");
-    try {
-      const res = await fetch("/api/douyin/works/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workIds: Array.from(selectedIds),
-          action: "transcribe",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`批量转写完成: ${data.succeeded} 成功, ${data.failed} 失败`);
-        setSelectedIds(new Set());
-        fetchWorks();
-      } else {
-        setMessage(`批量转写失败: ${data.error}`);
-      }
-    } catch {
-      setMessage("批量转写请求失败");
-    }
+  // --- Toolbar actions ---
+  const getSelectedSlugs = (): string[] => {
+    return bloggers
+      .filter((b) => selectedIds.has(b.id))
+      .map((b) => b.slug);
   };
 
-  const handleBatchSummarize = async () => {
+  const handleToolbarAction = async (action: ToolbarAction) => {
     setMessage("");
-    try {
-      const res = await fetch("/api/douyin/works/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workIds: Array.from(selectedIds),
-          action: "summarize",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`批量提取完成: ${data.succeeded} 成功, ${data.failed} 失败`);
-        setSelectedIds(new Set());
-        fetchWorks();
-      } else {
-        setMessage(`批量提取失败: ${data.error}`);
+    setProcessingAction(action);
+
+    const slugs =
+      selectedIds.size > 0
+        ? getSelectedSlugs()
+        : bloggers.map((b) => b.slug);
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const slug of slugs) {
+      try {
+        let res: Response;
+        switch (action) {
+          case "update-profile":
+            res = await fetch(`/api/douyin/bloggers/${slug}/update-profile`, {
+              method: "POST",
+            });
+            break;
+          case "scan":
+            res = await fetch(`/api/douyin/bloggers/${slug}/scan`, {
+              method: "POST",
+            });
+            break;
+          case "transcribe":
+            res = await fetch(`/api/douyin/bloggers/${slug}/transcribe`, {
+              method: "POST",
+            });
+            break;
+          case "summarize":
+            res = await fetch(`/api/douyin/bloggers/${slug}/summarize`, {
+              method: "POST",
+            });
+            break;
+          case "evaluate":
+            res = await fetch(`/api/douyin/bloggers/${slug}/evaluate`, {
+              method: "POST",
+            });
+            break;
+          default:
+            continue;
+        }
+        if (res.ok) succeeded++;
+        else failed++;
+      } catch {
+        failed++;
       }
-    } catch {
-      setMessage("批量提取请求失败");
     }
+
+    const actionLabels: Record<ToolbarAction, string> = {
+      "update-profile": "更新博主信息",
+      scan: "更新博主视频",
+      transcribe: "转写视频",
+      summarize: "提取观点",
+      evaluate: "评判",
+    };
+
+    setMessage(
+      `「${actionLabels[action]}」完成：${succeeded} 成功${
+        failed > 0 ? `，${failed} 失败` : ""
+      }`
+    );
+
+    setSelectedIds(new Set());
+    setExpandedId(null);
+    setWorksCache({});
+
+    // Refresh blogger list and data
+    await fetchBloggers();
+    setProcessingAction(null);
   };
 
-  // Global operations (preserved from old page)
-  const handleScan = async () => {
-    setScanning(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/douyin/scan", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`扫描完成：检查了 ${data.total} 个博主，发现 ${data.totalNewWorks} 条新作品`);
-        fetchWorks();
-      } else {
-        setMessage(`扫描失败: ${data.error}`);
-      }
-    } catch {
-      setMessage("扫描失败");
-    }
-    setScanning(false);
-  };
+  // --- Paginate bloggers on client side ---
+  const pagedBloggers = bloggers.slice(
+    bloggerPage * BLOGGERS_PER_PAGE,
+    (bloggerPage + 1) * BLOGGERS_PER_PAGE
+  );
 
-  const handleTranscribeAll = async () => {
-    setTranscribing(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/douyin/transcribe", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`转写完成：共 ${data.total} 条，成功 ${data.done} 条${data.failed > 0 ? `，失败 ${data.failed} 条` : ""}`);
-        fetchWorks();
-      } else {
-        setMessage(`转写失败: ${data.error}`);
-      }
-    } catch {
-      setMessage("转写请求失败");
-    }
-    setTranscribing(false);
-  };
-
-  const handleEvaluate = async () => {
-    setEvaluating(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/douyin/evaluate", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`评判完成：${data.totalBloggers} 个博主，共 ${data.totalPredictions} 条预测`);
-        fetchWorks();
-      } else {
-        setMessage(`评判失败: ${data.error}`);
-      }
-    } catch {
-      setMessage("评判请求失败");
-    }
-    setEvaluating(false);
+  const handlePageChange = (newPage: number) => {
+    setBloggerPage(newPage);
+    setSelectedIds(new Set());
+    setExpandedId(null);
+    setWorksCache({});
   };
 
   const clearMessage = () => setMessage("");
@@ -295,47 +274,17 @@ export default function DouyinSettingsPage() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Global action bar */}
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            添加博主
-          </Button>
-          <Button variant="outline" onClick={handleScan} disabled={scanning}>
-            {scanning ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            扫描全部
-          </Button>
-          <Button variant="outline" onClick={handleTranscribeAll} disabled={transcribing}>
-            {transcribing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Mic className="h-4 w-4 mr-2" />
-            )}
-            全部转写
-          </Button>
-          <Button variant="outline" onClick={handleEvaluate} disabled={evaluating}>
-            {evaluating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <BarChart3 className="h-4 w-4 mr-2" />
-            )}
-            收盘评判
-          </Button>
-        </div>
-
-        {/* Filter bar */}
-        <FilterBar
-          bloggers={bloggers}
-          filters={{ bloggerSlugs, transcriptStatus, judgment, search }}
-          filterCounts={filterCounts}
+        {/* Toolbar */}
+        <BloggerToolbar
           selectedCount={selectedIds.size}
-          onFilterChange={handleFilterChange}
-          onBatchTranscribe={handleBatchTranscribe}
-          onBatchSummarize={handleBatchSummarize}
+          totalCount={bloggers.length}
+          onAction={handleToolbarAction}
+          processingAction={processingAction}
+          onBloggerAdded={() => {
+            fetchBloggers();
+            setExpandedId(null);
+            setWorksCache({});
+          }}
         />
 
         {/* Feedback message */}
@@ -344,38 +293,31 @@ export default function DouyinSettingsPage() {
             <span className="text-muted-foreground">{message}</span>
             <button
               onClick={clearMessage}
-              className="text-muted-foreground hover:text-foreground ml-2"
+              className="text-muted-foreground hover:text-foreground ml-2 text-base leading-none"
             >
-              ✕
+              ×
             </button>
           </div>
         )}
 
-        {/* Works table */}
-        <WorksTable
-          works={works}
-          total={total}
-          page={page}
-          perPage={perPage}
+        {/* Blogger table */}
+        <BloggerTable
+          bloggers={pagedBloggers}
           selectedIds={selectedIds}
-          onToggle={handleToggle}
-          onToggleAll={handleToggleAll}
+          onToggleSelect={handleToggleSelect}
+          onDelete={handleDelete}
+          onExpand={handleExpand}
+          expandedId={expandedId}
+          worksCache={worksCache}
+          loadingWorks={loadingWorks}
           onTranscribe={handleTranscribe}
           onSummarize={handleSummarize}
+          loading={loadingBloggers}
+          page={bloggerPage}
           onPageChange={handlePageChange}
-          loading={loading}
+          total={bloggerTotal}
         />
       </CardContent>
-
-      {/* Add blogger dialog */}
-      <AddBloggerDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        onAdded={() => {
-          fetchBloggers();
-          fetchWorks();
-        }}
-      />
     </Card>
   );
 }
