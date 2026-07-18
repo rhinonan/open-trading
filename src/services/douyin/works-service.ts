@@ -56,8 +56,15 @@ export async function queryWorks(
     .where(and(...conditions));
 
   // judgement 过滤：通过 prediction_items 子查询
+  // "none" 特殊处理：evalStatus='none' 且无 prediction_items 记录
   let totalQuery: { get: () => { count: number } | undefined };
-  if (filter.judgment) {
+  if (filter.judgment === "none") {
+    totalQuery = db
+      .select({ count: sql<number>`count(distinct ${works.id})` })
+      .from(works)
+      .leftJoin(predictionItems, eq(works.id, predictionItems.workId))
+      .where(and(...conditions, sql`${predictionItems.id} IS NULL`));
+  } else if (filter.judgment) {
     totalQuery = db
       .select({ count: sql<number>`count(distinct ${works.id})` })
       .from(works)
@@ -102,12 +109,14 @@ export async function queryWorks(
     .innerJoin(bloggers, eq(works.bloggerId, bloggers.id))
     .leftJoin(predictionItems, eq(works.id, predictionItems.workId))
     .where(
-      filter.judgment
-        ? and(
-            ...conditions,
-            eq(predictionItems.judgment, filter.judgment as JudgmentResult)
-          )
-        : and(...conditions)
+      filter.judgment === "none"
+        ? and(...conditions, sql`${predictionItems.id} IS NULL`)
+        : filter.judgment
+          ? and(
+              ...conditions,
+              eq(predictionItems.judgment, filter.judgment as JudgmentResult)
+            )
+          : and(...conditions)
     )
     // Dedup: LEFT JOIN on predictionItems can yield multiple rows per work;
     // SQLite picks one joined row per group, keeping pagination correct.
@@ -116,6 +125,38 @@ export async function queryWorks(
     .limit(perPage)
     .offset(page * perPage)
     .all();
+
+  // 批量取判断聚合（避免 N+1）
+  const workIds = rows.map((r) => r.id);
+  const aggMap = new Map<number, WorkJudgment>();
+  if (workIds.length > 0) {
+    const aggRows = db
+      .select({
+        workId: predictionItems.workId,
+        evaluable: sql<number>`count(case when ${predictionItems.judgment} in ('correct','mostly_correct','incorrect') then 1 end)`,
+        correct: sql<number>`count(case when ${predictionItems.judgment} = 'correct' then 1 end)`,
+        mostlyCorrect: sql<number>`count(case when ${predictionItems.judgment} = 'mostly_correct' then 1 end)`,
+        incorrect: sql<number>`count(case when ${predictionItems.judgment} = 'incorrect' then 1 end)`,
+        notYet: sql<number>`count(case when ${predictionItems.judgment} = 'not_yet' then 1 end)`,
+        notApplicable: sql<number>`count(case when ${predictionItems.judgment} = 'not_applicable' then 1 end)`,
+      })
+      .from(predictionItems)
+      .where(inArray(predictionItems.workId, workIds))
+      .groupBy(predictionItems.workId)
+      .all();
+    for (const a of aggRows) {
+      aggMap.set(a.workId, {
+        evalStatus: "done" as const,
+        evaluable: Number(a.evaluable ?? 0),
+        correct: Number(a.correct ?? 0),
+        mostlyCorrect: Number(a.mostlyCorrect ?? 0),
+        incorrect: Number(a.incorrect ?? 0),
+        notYet: Number(a.notYet ?? 0),
+        notApplicable: Number(a.notApplicable ?? 0),
+        latestItem: null,
+      });
+    }
+  }
 
   const enriched: WorkWithBlogger[] = rows.map((row) => ({
     id: row.id,
@@ -135,22 +176,26 @@ export async function queryWorks(
       avatarUrl: row.bloggerAvatarUrl,
       followerCount: row.bloggerFollowerCount ?? 0,
     },
-    judgment:
-      row.judgmentResult
-        ? {
-            evalStatus: (row.evalStatus ?? "none") as WorkJudgment["evalStatus"],
-            evaluable: 0,
-            correct: 0,
-            mostlyCorrect: 0,
-            incorrect: 0,
-            notYet: 0,
-            notApplicable: 0,
-            latestItem: {
-              judgment: row.judgmentResult,
-              predictedContent: row.judgmentContent ?? "",
-            },
-          }
-        : null,
+    judgment: (() => {
+      const agg = aggMap.get(row.id);
+      const latestItem = row.judgmentResult
+        ? { judgment: row.judgmentResult, predictedContent: row.judgmentContent ?? "" }
+        : null;
+      if (agg) {
+        agg.latestItem = latestItem;
+        agg.evalStatus = (row.evalStatus ?? "none") as WorkJudgment["evalStatus"];
+        return agg;
+      }
+      if (latestItem) {
+        return {
+          evalStatus: (row.evalStatus ?? "none") as WorkJudgment["evalStatus"],
+          evaluable: 0, correct: 0, mostlyCorrect: 0, incorrect: 0,
+          notYet: 0, notApplicable: 0,
+          latestItem,
+        };
+      }
+      return null;
+    })(),
   }));
 
   // 计算 filter counts

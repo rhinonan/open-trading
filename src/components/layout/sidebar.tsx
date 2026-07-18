@@ -55,7 +55,7 @@ export function Sidebar() {
         {!collapsed && (
           <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
             <TrendingUp className="h-5 w-5 text-sidebar-primary" />
-            <span>Open Trading</span>
+            <span className="font-display uppercase tracking-wide">Open Trading</span>
           </Link>
         )}
         {collapsed && (
@@ -108,7 +108,12 @@ export function Sidebar() {
       </ScrollArea>
 
       {/* Bottom actions */}
-      <div className="border-t border-sidebar-border p-3 flex items-center justify-center">
+      <div
+        className={cn(
+          "border-t border-sidebar-border p-3 flex items-center",
+          collapsed ? "justify-center" : "justify-end"
+        )}
+      >
         <Button
           variant="ghost"
           size="icon"

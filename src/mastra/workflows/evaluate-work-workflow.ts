@@ -134,7 +134,7 @@ const persistStep = createStep({
             predictionTarget: p.target,
             relatedSymbols: JSON.stringify(p.symbols),
             judgment: p.judgment,
-            verifiableAfter: p.verifiableAfter ?? null,
+            verifiableAfter: p.verifiableAfter?.trim() || null,
             reasoning: p.reasoning,
             evidence: JSON.stringify(p.evidence),
             judgedAt: now,
