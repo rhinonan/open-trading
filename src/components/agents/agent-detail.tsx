@@ -18,7 +18,10 @@ export function AgentDetail({ agent }: AgentDetailProps) {
       .then((r) => r.json())
       .then((d) => {
         if (d.success && d.mounts) {
-          setMountedSkills(d.mounts[agent.key] ?? []);
+          const installedNames: string[] = d.skills ?? [];
+          const mounted = d.mounts[agent.key] ?? [];
+          // 只展示已安装且启用的 skill（过滤掉默认挂载中未安装的）
+          setMountedSkills(mounted.filter((s: string) => installedNames.includes(s)));
         }
       })
       .catch(() => {});

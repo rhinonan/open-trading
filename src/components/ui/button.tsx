@@ -44,11 +44,17 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  render,
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // 当 render 为 <a> 等非 button 元素时，关闭 nativeButton 避免 Base UI 警告
+  const resolvedNativeButton = nativeButton ?? (render ? false : undefined)
   return (
     <ButtonPrimitive
       data-slot="button"
+      render={render}
+      nativeButton={resolvedNativeButton}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
