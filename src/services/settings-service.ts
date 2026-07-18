@@ -20,11 +20,12 @@ export async function setSetting(key: string, value: string): Promise<void> {
     .run();
 }
 
-export type LlmFlow = "opinion" | "evaluation";
+export type LlmFlow = "opinion" | "evaluation" | "skills-review";
 
 export const LLM_MODEL_KEYS: Record<LlmFlow, string> = {
   opinion: "llm_model_opinion",
   evaluation: "llm_model_evaluation",
+  "skills-review": "llm_model_skills_review",
 };
 
 /** 读取某流程配置的 LLM 模型，未设置时返回默认模型 */
