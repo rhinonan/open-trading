@@ -10,4 +10,5 @@ export interface AgentMeta {
 export const AGENT_META: Record<string, AgentMeta> = {
   opinionAgent: { flow: "opinion", description: "抖音博主观点摘要提取" },
   evaluatorAgent: { flow: "evaluation", description: "抖音博主观点准确度评判，对比行情数据判定预测正确性" },
+  skillReviewerAgent: { flow: "skills-review", description: "Skill 安装自动审查：安全/执行边界/开源协议" },
 };

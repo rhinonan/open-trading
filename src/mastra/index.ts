@@ -3,6 +3,7 @@ import { Mastra } from "@mastra/core";
 import { LibSQLStore } from "@mastra/libsql";
 import { opinionAgent } from "@/mastra/agents/opinion-agent";
 import { evaluatorAgent } from "@/mastra/agents/evaluator-agent";
+import { skillReviewerAgent } from "@/mastra/agents/skill-reviewer-agent";
 import { transcribeWorkWorkflow } from "@/mastra/workflows/transcribe-work-workflow";
 import { evaluateWorkWorkflow } from "@/mastra/workflows/evaluate-work-workflow";
 import { dataPath } from "@/lib/data-root";
@@ -13,7 +14,7 @@ const storageUrl =
   "file:" + dataPath("mastra.db").replace(/\\/g, "/");
 
 export const mastra = new Mastra({
-  agents: { opinionAgent, evaluatorAgent },
+  agents: { opinionAgent, evaluatorAgent, skillReviewerAgent },
   workflows: { transcribeWorkWorkflow, evaluateWorkWorkflow },
   storage: new LibSQLStore({
     id: "mastra-storage",
