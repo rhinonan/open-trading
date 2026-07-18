@@ -26,7 +26,9 @@ const JUDGMENT_OPTIONS = [
   { value: "correct", label: "✅ 正确" },
   { value: "mostly_correct", label: "💚 基本正确" },
   { value: "incorrect", label: "❌ 不正确" },
+  { value: "not_yet", label: "⏳ 待验证" },
   { value: "not_applicable", label: "➖ 不涉及" },
+  { value: "none", label: "未评判" },
 ];
 
 export function FilterBar({

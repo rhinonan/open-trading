@@ -1,7 +1,9 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import type { WorkWithBlogger, JudgmentResult } from "@/types";
+import { useState, useEffect } from "react";
+import { EvalDetailPanel } from "./EvalDetailPanel";
+import type { WorkWithBlogger, JudgmentResult, PredictionItem } from "@/types";
 
 const TRANSCRIPT_STATUS_CONFIG: Record<
   string,
@@ -17,10 +19,11 @@ const JUDGMENT_CONFIG: Record<
   string,
   { label: string; color: string; icon: string }
 > = {
-  correct: { label: "正确", color: "text-green-600", icon: "✅" },
-  mostly_correct: { label: "基本正确", color: "text-emerald-600", icon: "💚" },
-  incorrect: { label: "不正确", color: "text-red-600", icon: "❌" },
+  correct: { label: "正确", color: "text-green-600 dark:text-green-400", icon: "✅" },
+  mostly_correct: { label: "基本正确", color: "text-emerald-600 dark:text-emerald-400", icon: "💚" },
+  incorrect: { label: "不正确", color: "text-red-600 dark:text-red-400", icon: "❌" },
   not_applicable: { label: "不涉及", color: "text-gray-400", icon: "➖" },
+  not_yet: { label: "待验证", color: "text-amber-500", icon: "⏳" },
 };
 
 function formatRelativeTime(timestamp: number): string {
@@ -72,6 +75,31 @@ export function WorkRow({
     work.transcriptStatus === "pending" || work.transcriptStatus === "failed";
   const canSummarize =
     work.transcriptStatus === "done" && !hasOpinion;
+
+  // Expanded detail state
+  const [evalItems, setEvalItems] = useState<PredictionItem[]>([]);
+  const [evalItemsLoading, setEvalItemsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isExpanded && work.judgment?.evalStatus === "done") {
+      setEvalItemsLoading(true);
+      fetch(`/api/douyin/records?workId=${work.id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) setEvalItems(data.items);
+        })
+        .catch(() => {})
+        .finally(() => setEvalItemsLoading(false));
+    }
+  }, [isExpanded, work.id, work.judgment?.evalStatus]);
+
+  const isJudged = work.judgment?.latestItem?.judgment;
+  // Aggregate badge - show counts if available
+  const aggBadge = work.judgment && (
+    work.judgment.evaluable > 0 ||
+    work.judgment.notYet > 0 ||
+    work.judgment.notApplicable > 0
+  );
 
   return (
     <>
@@ -152,13 +180,26 @@ export function WorkRow({
           )}
         </td>
         <td className="py-3 pr-3">
-          {jConfig ? (
-            <span className={`text-xs font-medium ${jConfig.color}`}>
-              {jConfig.icon} {jConfig.label}
-            </span>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
+          <div className="flex flex-col gap-1">
+            {jConfig ? (
+              <span className={`text-xs font-medium ${jConfig.color}`}>
+                {jConfig.icon} {jConfig.label}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            )}
+            {aggBadge && (
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs">
+                {work.judgment!.evaluable > 0 && (
+                  <>{work.judgment!.correct}✓ {work.judgment!.incorrect}✗</>
+                )}
+                {work.judgment!.notYet > 0 && (
+                  <span className="text-amber-500">{work.judgment!.notYet}⏳</span>
+                )}
+                {work.judgment!.evaluable === 0 && work.judgment!.notYet === 0 && "无预测"}
+              </span>
+            )}
+          </div>
         </td>
         <td className="py-3 pr-4">
           <div className="flex items-center gap-1">
@@ -202,7 +243,17 @@ export function WorkRow({
       {isExpanded && (
         <tr key={`detail-${work.id}`}>
           <td colSpan={8} className="bg-muted/30 px-4 py-3">
-            <WorkDetailPanel work={work} />
+            {work.judgment?.evalStatus === "done" && evalItems.length > 0 ? (
+              <EvalDetailPanel items={evalItems} />
+            ) : evalItemsLoading ? (
+              <div className="text-sm text-muted-foreground py-2">加载中...</div>
+            ) : (
+              <WorkDetailPanel work={work} />
+            )}
+            {/* If judged but items not yet loaded, also show work detail */}
+            {work.judgment?.evalStatus !== "done" && !evalItemsLoading && (
+              <WorkDetailPanel work={work} />
+            )}
           </td>
         </tr>
       )}

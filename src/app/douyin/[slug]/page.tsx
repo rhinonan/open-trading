@@ -300,16 +300,108 @@ export default function BloggerDetailPage({
         </>
       )}
 
-      {/* Summary Tab */}
+      {/* Summary Tab with five-tier judgment bar */}
       {tab === "summary" && (
-        <Card className="border-dashed">
-          <CardContent className="text-center py-12">
-            <p className="text-muted-foreground">评判记录功能将在 Task 8 重构</p>
-            <p className="text-sm text-muted-foreground/60 mt-1">
-              请暂时查看作品列表中的评判状态
-            </p>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          {/* Five-tier horizontal bar */}
+          {totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable > 0 ? (
+            <>
+              <div className="flex h-6 w-full overflow-hidden rounded-full">
+                {judgmentCounts.correct > 0 && (
+                  <div
+                    className="bg-green-500 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    style={{ width: `${(judgmentCounts.correct / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
+                    title={`正确 ${judgmentCounts.correct}`}
+                  >
+                    {judgmentCounts.correct}
+                  </div>
+                )}
+                {judgmentCounts.mostly_correct > 0 && (
+                  <div
+                    className="bg-blue-500 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    style={{ width: `${(judgmentCounts.mostly_correct / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
+                    title={`基本正确 ${judgmentCounts.mostly_correct}`}
+                  >
+                    {judgmentCounts.mostly_correct}
+                  </div>
+                )}
+                {judgmentCounts.incorrect > 0 && (
+                  <div
+                    className="bg-red-500 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    style={{ width: `${(judgmentCounts.incorrect / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
+                    title={`错误 ${judgmentCounts.incorrect}`}
+                  >
+                    {judgmentCounts.incorrect}
+                  </div>
+                )}
+                {judgmentCounts.not_yet > 0 && (
+                  <div
+                    className="bg-amber-400 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    style={{ width: `${(judgmentCounts.not_yet / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
+                    title={`待验证 ${judgmentCounts.not_yet}`}
+                  >
+                    {judgmentCounts.not_yet}
+                  </div>
+                )}
+                {judgmentCounts.not_applicable > 0 && (
+                  <div
+                    className="bg-gray-400 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    style={{ width: `${(judgmentCounts.not_applicable / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
+                    title={`不涉及 ${judgmentCounts.not_applicable}`}
+                  >
+                    {judgmentCounts.not_applicable}
+                  </div>
+                )}
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap gap-3 text-xs">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-green-500" />
+                  正确: {judgmentCounts.correct}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-blue-500" />
+                  基本正确: {judgmentCounts.mostly_correct}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-red-500" />
+                  错误: {judgmentCounts.incorrect}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-amber-400" />
+                  待验证: {judgmentCounts.not_yet}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-gray-400" />
+                  不涉及: {judgmentCounts.not_applicable}
+                </span>
+              </div>
+
+              {/* Accuracy */}
+              <div className="rounded border p-3">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">准确率（可评判项）：</span>
+                  <span className="font-bold text-lg ml-1">
+                    {accuracy !== null ? `${accuracy}%` : "暂无数据"}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    （共 {totalJudged} 条可评判预测）
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="text-center py-12">
+                <p className="text-muted-foreground">暂无评判数据</p>
+                <p className="text-sm text-muted-foreground/60 mt-1">
+                  完成视频转写并运行评判后将会显示
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Image preview lightbox */}
