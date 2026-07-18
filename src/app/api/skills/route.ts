@@ -1,6 +1,7 @@
 // src/app/api/skills/route.ts
 import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
+import { mastra } from "@/mastra";
 
 export async function GET() {
   try {
@@ -9,7 +10,7 @@ export async function GET() {
   } catch (err) {
     return Response.json(
       { success: false, error: err instanceof Error ? err.message : "获取列表失败" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -20,12 +21,26 @@ export async function POST(req: NextRequest) {
     if (!url || typeof url !== "string" || !url.trim()) {
       return Response.json({ success: false, error: "请提供 GitHub 仓库 URL" }, { status: 400 });
     }
-    const result = await skillService.installFromUrl(url.trim());
-    return Response.json({ success: true, ...result });
+
+    // 1. 下载到 staging
+    const installed = await skillService.installToStaging(url.trim());
+
+    // 2. 触发审查
+    const run = await mastra.getWorkflow("skillReviewWorkflow").createRun();
+    const reviewResult = await run.start({ inputData: { name: installed.name } });
+
+    // 3. 返回结果（含审查状态）
+    const stagingInfo = skillService.getStaging(installed.name);
+    return Response.json({
+      success: true,
+      name: installed.name,
+      version: installed.version,
+      review: stagingInfo?.review ?? null,
+    });
   } catch (err) {
     return Response.json(
       { success: false, error: err instanceof Error ? err.message : "安装失败" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
