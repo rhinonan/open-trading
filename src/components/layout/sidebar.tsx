@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Menu,
   Radio,
+  ScrollText,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { label: "舆情分析", href: "/sentiment", icon: MessageCircle },
   { label: "财报 & 研报", href: "/financials", icon: FileText },
   { label: "Agent 管理", href: "/agents", icon: Bot },
+  { label: "Agent 日志", href: "/agents/logs", icon: ScrollText },
   { label: "设置", href: "/settings", icon: Settings },
 ];
 
