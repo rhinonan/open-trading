@@ -98,7 +98,16 @@ export async function scanBlogger(
             coverUrl = post.video?.cover?.url_list?.[0] || "";
           }
 
-          db.insert(works)
+          // 图集最多存 10 张图片（每张取 url_list 首个 URL）
+          let imageUrls: string[] = [];
+          if (isImage && post.images?.length) {
+            imageUrls = post.images
+              .slice(0, 10)
+              .map((img: { url_list: string[] }) => img.url_list[0])
+              .filter(Boolean);
+          }
+
+          await db.insert(works)
             .values({
               awemeId: post.aweme_id,
               bloggerId: blogger.id,
@@ -111,7 +120,9 @@ export async function scanBlogger(
               shareUrl: post.share_url || "",
               statistics: JSON.stringify(post.statistics || {}),
               publishedAt: post.create_time,
-              transcriptStatus: isVideo ? "pending" : "done",
+              transcriptStatus: "pending", // 图集与视频均入队
+              mediaType: post.media_type,
+              imageUrls: JSON.stringify(imageUrls),
             })
             .run();
         }
