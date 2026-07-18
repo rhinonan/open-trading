@@ -79,5 +79,12 @@ export async function downloadImages(
     }
   }
 
+  // 全部失败时抛错，让 workflow 步骤的 retries 生效（部分成功仍照常返回）
+  if (imageUrls.length > 0 && localPaths.length === 0) {
+    throw new Error(
+      `Failed to download any images for ${awemeId}: all ${imageUrls.length} URLs failed`
+    );
+  }
+
   return localPaths;
 }

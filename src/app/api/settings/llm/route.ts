@@ -6,12 +6,14 @@ import {
 } from "@/services/settings-service";
 
 async function currentSettings() {
-  const [opinionModel, evaluationModel, skillsReviewModel] = await Promise.all([
-    getLlmModel("opinion"),
-    getLlmModel("evaluation"),
-    getLlmModel("skills-review"),
-  ]);
-  return { opinionModel, evaluationModel, skillsReviewModel };
+  const [opinionModel, evaluationModel, skillsReviewModel, imageOpinionModel] =
+    await Promise.all([
+      getLlmModel("opinion"),
+      getLlmModel("evaluation"),
+      getLlmModel("skills-review"),
+      getLlmModel("imageOpinion"),
+    ]);
+  return { opinionModel, evaluationModel, skillsReviewModel, imageOpinionModel };
 }
 
 export async function GET() {
@@ -27,13 +29,18 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const body: { opinionModel?: unknown; evaluationModel?: unknown; skillsReviewModel?: unknown } =
-      await request.json();
+    const body: {
+      opinionModel?: unknown;
+      evaluationModel?: unknown;
+      skillsReviewModel?: unknown;
+      imageOpinionModel?: unknown;
+    } = await request.json();
 
     for (const [field, value] of [
       ["opinionModel", body.opinionModel],
       ["evaluationModel", body.evaluationModel],
       ["skillsReviewModel", body.skillsReviewModel],
+      ["imageOpinionModel", body.imageOpinionModel],
     ] as const) {
       if (
         value !== undefined &&
@@ -54,6 +61,9 @@ export async function PUT(request: Request) {
     }
     if (typeof body.skillsReviewModel === "string") {
       await setSetting(LLM_MODEL_KEYS["skills-review"], body.skillsReviewModel.trim());
+    }
+    if (typeof body.imageOpinionModel === "string") {
+      await setSetting(LLM_MODEL_KEYS.imageOpinion, body.imageOpinionModel.trim());
     }
 
     return Response.json(await currentSettings());

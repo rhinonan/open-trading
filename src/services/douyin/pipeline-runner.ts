@@ -84,14 +84,17 @@ function workflowErrorMessage(result: {
     : `workflow ended with status: ${result.status}`;
 }
 
-/** 真实任务执行：按 videoUrl 分派——视频走转写 workflow，图集走图片分析 workflow；
+/** 真实任务执行：按 mediaType 分派——视频(4)走转写 workflow，图集(2)走图片分析 workflow；
  *  自身消化所有错误（失败回写 DB），不抛出 */
 async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
-  const { id, awemeId, videoUrl, duration, desc, imageUrls } = work;
+  const { id, awemeId, videoUrl, duration, desc, mediaType, imageUrls } = work;
   const logPrefix = `[${awemeId}]`;
   try {
-    if (videoUrl) {
-      // 视频：走现有转写 workflow
+    if (mediaType === 4) {
+      // 视频：走现有转写 workflow；缺下载地址视为失败（而非误入图集分支）
+      if (!videoUrl) {
+        throw new Error("视频作品缺少下载地址（videoUrl 为空）");
+      }
       const run = await mastra.getWorkflow("transcribeWorkWorkflow").createRun();
       const result = await run.start({
         inputData: { workId: id, awemeId, videoUrl, duration, desc },
@@ -101,7 +104,7 @@ async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
       }
       // done 状态与 transcript/opinionSummary 由 workflow 末步回写 DB
       console.log(`${logPrefix} ✅ 转写完成`);
-    } else {
+    } else if (mediaType === 2) {
       // 图集：走图片分析 workflow（imageUrls 列存 JSON 数组字符串，解析后传入）
       const parsedUrls: string[] = JSON.parse(imageUrls || "[]");
       const run = await mastra.getWorkflow("analyzeImageWorkflow").createRun();
@@ -112,6 +115,9 @@ async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
         throw new Error(workflowErrorMessage(result));
       }
       console.log(`${logPrefix} ✅ 图集分析完成`);
+    } else {
+      // 未知媒体类型：显式失败，避免误路由或卡死在 processing
+      throw new Error(`未知 mediaType: ${mediaType}`);
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
