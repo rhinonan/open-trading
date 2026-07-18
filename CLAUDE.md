@@ -53,6 +53,16 @@ API 有全局与单博主两套入口：`/api/douyin/{scan,transcribe,evaluate}`
 - Tailwind v4 无 config 文件，主题变量在 `src/app/globals.css`；shadcn 组件在 `src/components/ui`，图标用 lucide-react。
 - 设计文档在 `docs/superpowers/specs/`，实施计划在 `docs/superpowers/plans/`——了解某功能的来龙去脉先看这里。
 
+## 架构纪律（桌面/SaaS 双形态预留，2026-07 约定）
+
+以下规矩约束**新增代码**（存量不强制回改），目的是让未来的双形态改造只需要动适配层：
+
+1. **DB 调用一律写 `await`**：即使 better-sqlite3 驱动是同步的，调用处也写 `await db...`（无害），保证将来换异步驱动（libsql / Postgres）时调用面零改动。
+2. **落盘路径一律走 `dataPath()`**（`src/lib/data-root.ts`）：禁止新增 `process.cwd()` 拼 `data/` 路径；数据目录整体位置只由 `DATA_ROOT` 环境变量决定（桌面端将指向 userData 目录）。
+3. **新外部服务的密钥/配置进 settings 表**（经 settings-service 读写），不新增 env-only 读取；env 只作为部署级默认值。
+4. **业务层不感知部署形态**：形态差异（DB 驱动、密钥来源、runner 驱动、数据路径）只允许出现在适配层；业务代码禁止出现 `if (isDesktop)` 之类分支。
+5. **表行类型从 schema 派生**：一律 `typeof <table>.$inferSelect`，禁止手写 interface 再用 `as` 断言。
+
 ## 已知技术债（2026-07 架构评审）
 
 按优先级排列，修复后请从此列表移除对应条目：
