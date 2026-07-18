@@ -97,6 +97,23 @@ export default function DouyinSettingsPage() {
     fetchWorksForBlogger();
   }, [expandedId, bloggers, worksCache]);
 
+  // --- Poll works while transcribing ---
+  // 展开的作品列表里还有 processing 时，每 5 秒失效缓存触发重取；
+  // 全部完成后自动停止。
+  useEffect(() => {
+    if (expandedId === null) return;
+    const list = worksCache[expandedId];
+    if (!list?.some((w) => w.transcriptStatus === "processing")) return;
+    const timer = setInterval(() => {
+      setWorksCache((prev) => {
+        const next = { ...prev };
+        delete next[expandedId];
+        return next;
+      });
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [expandedId, worksCache]);
+
   // --- Selection ---
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -144,7 +161,7 @@ export default function DouyinSettingsPage() {
       const res = await fetch(`/api/douyin/works/${workId}/transcribe`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        setMessage("转写任务已启动");
+        setMessage("转写任务已加入队列，完成后自动刷新");
         // Invalidate cache for the expanded blogger to refresh
         if (expandedId) {
           setWorksCache((prev) => {
