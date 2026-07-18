@@ -1,10 +1,15 @@
-// src/app/api/douyin/evaluate/route.ts
-// Task 6 接入 eval-queue + eval-runner 后实物化；当前为占位
+import { enqueueForEvaluation } from "@/services/douyin/eval-queue";
+import { getEvalRunner } from "@/services/douyin/eval-runner";
 
-export async function POST(_request: Request) {
-  return Response.json({
-    success: true,
-    enqueued: 0,
-    message: "待 eval-queue 接入（Task 6）",
-  });
+export async function POST() {
+  try {
+    const count = enqueueForEvaluation();
+    getEvalRunner().kick();
+    return Response.json({ success: true, enqueued: count });
+  } catch (err) {
+    return Response.json(
+      { success: false, error: err instanceof Error ? err.message : "入队失败" },
+      { status: 500 }
+    );
+  }
 }
