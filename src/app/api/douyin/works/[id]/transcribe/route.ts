@@ -1,6 +1,6 @@
 // src/app/api/douyin/works/[id]/transcribe/route.ts
 import { NextRequest } from "next/server";
-import { transcribeWork } from "@/services/douyin/works-service";
+import { startTranscribeWork } from "@/services/douyin/pipeline-service";
 
 export async function POST(
   _req: NextRequest,
@@ -13,7 +13,7 @@ export async function POST(
       return Response.json({ error: "Invalid work ID" }, { status: 400 });
     }
 
-    const result = await transcribeWork(workId);
+    const result = startTranscribeWork(workId);
     if (!result.success) {
       const status = result.error === "该作品正在转写中" ? 409 : 400;
       return Response.json({ error: result.error }, { status });

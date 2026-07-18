@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import * as bloggerService from "@/services/douyin/blogger-service";
-import { transcribeBloggerWorks } from "@/services/douyin/pipeline-service";
+import { startTranscribeBloggerWorks } from "@/services/douyin/pipeline-service";
 
 export async function POST(
   _req: NextRequest,
@@ -12,7 +12,7 @@ export async function POST(
     if (!blogger) {
       return Response.json({ success: false, error: "博主不存在" }, { status: 404 });
     }
-    const result = await transcribeBloggerWorks(blogger.id);
+    const result = startTranscribeBloggerWorks(blogger.id);
     return Response.json({ success: true, ...result });
   } catch (err) {
     return Response.json(
