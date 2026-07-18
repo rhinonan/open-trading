@@ -93,14 +93,12 @@ export function enqueueWork(
   const row = dbi
     .select({
       id: works.id,
-      videoUrl: works.videoUrl,
       transcriptStatus: works.transcriptStatus,
     })
     .from(works)
     .where(eq(works.id, workId))
     .get();
   if (!row) return { queued: false, reason: "作品不存在" };
-  if (!row.videoUrl) return { queued: false, reason: "该作品没有视频链接" };
   if (row.transcriptStatus === "processing")
     return { queued: false, reason: "该作品正在转写中" };
 

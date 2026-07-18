@@ -131,13 +131,12 @@ describe("enqueueWork", () => {
     });
   });
 
-  it("没有视频链接", () => {
+  it("无视频链接的图集作品也可入队", () => {
     const b = seedBlogger();
     const w = seedWork(b, { videoUrl: null });
-    expect(enqueueWork(w, dbi)).toEqual({
-      queued: false,
-      reason: "该作品没有视频链接",
-    });
+    expect(enqueueWork(w, dbi)).toEqual({ queued: true });
+    expect(getWork(w).transcriptStatus).toBe("pending");
+    expect(getWork(w).claimedAt).toBeNull();
   });
 
   it("正在转写中不重复入队", () => {
