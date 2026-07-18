@@ -15,6 +15,10 @@ export interface ClaimedWork {
   videoUrl: string | null;
   duration: number;
   desc: string;
+  /** 媒体类型：2=图集, 4=视频 */
+  mediaType: number;
+  /** 图集图片 URL 列表（JSON 数组字符串） */
+  imageUrls: string;
 }
 
 function nowEpoch(): number {
@@ -35,6 +39,8 @@ export function claimNextPending(
         videoUrl: works.videoUrl,
         duration: works.duration,
         desc: works.desc,
+        mediaType: works.mediaType,
+        imageUrls: works.imageUrls,
       })
       .from(works)
       .where(eq(works.transcriptStatus, "pending"))

@@ -72,27 +72,47 @@ export function createRunner(opts: RunnerOptions): Runner {
   return { kick, isRunning: () => running };
 }
 
-/** 真实任务执行：跑 Mastra 转写 workflow；自身消化所有错误（失败回写 DB），不抛出 */
+/** 非 success 的 workflow 运行结果 → 提取错误信息（两条分派路径共用） */
+function workflowErrorMessage(result: {
+  status: string;
+  error?: unknown;
+}): string {
+  return result.status === "failed"
+    ? result.error instanceof Error
+      ? result.error.message
+      : String(result.error)
+    : `workflow ended with status: ${result.status}`;
+}
+
+/** 真实任务执行：按 videoUrl 分派——视频走转写 workflow，图集走图片分析 workflow；
+ *  自身消化所有错误（失败回写 DB），不抛出 */
 async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
-  const { id, awemeId, videoUrl, duration, desc } = work;
+  const { id, awemeId, videoUrl, duration, desc, imageUrls } = work;
   const logPrefix = `[${awemeId}]`;
   try {
-    if (!videoUrl) throw new Error("No video_url stored for this work");
-    const run = await mastra.getWorkflow("transcribeWorkWorkflow").createRun();
-    const result = await run.start({
-      inputData: { workId: id, awemeId, videoUrl, duration, desc },
-    });
-    if (result.status !== "success") {
-      const errorMsg =
-        result.status === "failed"
-          ? result.error instanceof Error
-            ? result.error.message
-            : String(result.error)
-          : `workflow ended with status: ${result.status}`;
-      throw new Error(errorMsg);
+    if (videoUrl) {
+      // 视频：走现有转写 workflow
+      const run = await mastra.getWorkflow("transcribeWorkWorkflow").createRun();
+      const result = await run.start({
+        inputData: { workId: id, awemeId, videoUrl, duration, desc },
+      });
+      if (result.status !== "success") {
+        throw new Error(workflowErrorMessage(result));
+      }
+      // done 状态与 transcript/opinionSummary 由 workflow 末步回写 DB
+      console.log(`${logPrefix} ✅ 转写完成`);
+    } else {
+      // 图集：走图片分析 workflow（imageUrls 列存 JSON 数组字符串，解析后传入）
+      const parsedUrls: string[] = JSON.parse(imageUrls || "[]");
+      const run = await mastra.getWorkflow("analyzeImageWorkflow").createRun();
+      const result = await run.start({
+        inputData: { workId: id, awemeId, desc, imageUrls: parsedUrls },
+      });
+      if (result.status !== "success") {
+        throw new Error(workflowErrorMessage(result));
+      }
+      console.log(`${logPrefix} ✅ 图集分析完成`);
     }
-    // done 状态与 transcript/opinionSummary 由 workflow 末步回写 DB
-    console.log(`${logPrefix} ✅ 转写完成`);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error(`${logPrefix} ❌ 失败: ${errorMsg}`);
