@@ -3,6 +3,7 @@ import path from "path";
 import { Mastra } from "@mastra/core";
 import { LibSQLStore } from "@mastra/libsql";
 import { opinionAgent } from "@/mastra/agents/opinion-agent";
+import { evaluatorAgent } from "@/mastra/agents/evaluator-agent";
 import { transcribeWorkWorkflow } from "@/mastra/workflows/transcribe-work-workflow";
 
 // 绝对路径 + 正斜杠：与业务库 data/douyin.db 分离，
@@ -11,7 +12,7 @@ const storageUrl =
   "file:" + path.join(process.cwd(), "data", "mastra.db").replace(/\\/g, "/");
 
 export const mastra = new Mastra({
-  agents: { opinionAgent },
+  agents: { opinionAgent, evaluatorAgent },
   workflows: { transcribeWorkWorkflow },
   storage: new LibSQLStore({
     id: "mastra-storage",

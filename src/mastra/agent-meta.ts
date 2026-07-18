@@ -9,4 +9,5 @@ export interface AgentMeta {
 // agent 注册键 → 页面元数据；新增 agent 时在此补一行
 export const AGENT_META: Record<string, AgentMeta> = {
   opinionAgent: { flow: "opinion", description: "抖音博主观点摘要提取" },
+  evaluatorAgent: { flow: "evaluation", description: "抖音博主观点准确度评判，对比行情数据判定预测正确性" },
 };
