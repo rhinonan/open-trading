@@ -250,7 +250,7 @@ export default function BloggerDetailPage({
                     <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent" />
 
                     <div className="absolute bottom-1.5 left-2 flex items-center gap-1.5 text-white text-xs">
-                      {!!work.videoUrl ? (
+                      {work.mediaType === 4 ? (
                         <Play className="h-3 w-3 fill-white" />
                       ) : (
                         <ImageIcon className="h-3 w-3" />
@@ -472,7 +472,7 @@ function WorkDetailSheet({
     className: "bg-muted",
   };
 
-  const isVideo = !!work.videoUrl;
+  const isVideo = work.mediaType === 4;
 
   return (
     <div

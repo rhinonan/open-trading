@@ -161,6 +161,7 @@ export interface WorkWithBlogger {
   awemeId: string;
   desc: string;
   coverUrl: string;
+  mediaType: number;
   duration: number;
   statistics: string;
   publishedAt: number;
