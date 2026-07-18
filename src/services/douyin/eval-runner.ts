@@ -13,10 +13,45 @@ import {
 } from "@/services/douyin/eval-queue";
 import { getSetting, setSetting } from "@/services/settings-service";
 import { parseCron, cronMatches } from "@/lib/cron-matcher";
+import { mastra } from "@/mastra";
 
 const CONCURRENCY = 1; // 东财限流 + sandbox，串行唯一选择
 const DEFAULT_CRON = "5 17 * * 1-5";
 const TICK_INTERVAL_MS = 60_000; // 每分钟 tick 一次
+
+/** 执行 Mastra evaluateWorkWorkflow；自身消化所有错误（失败回写 DB），不抛出 */
+async function runEvalWorkflow(
+  work: ClaimedEvalWork,
+  dbi: Db = db,
+): Promise<void> {
+  const { id, awemeId } = work;
+  try {
+    const run = await mastra
+      .getWorkflow("evaluateWorkWorkflow")
+      .createRun();
+    const result = await run.start({
+      inputData: {
+        workId: id,
+        awemeId,
+        desc: work.desc,
+        transcript: work.transcript,
+        opinionSummary: work.opinionSummary,
+        publishedAt: work.publishedAt,
+        bloggerId: work.bloggerId,
+      },
+    });
+    if (result.status !== "success") {
+      throw new Error(
+        result.status === "failed"
+          ? String(result.error)
+          : `status: ${result.status}`,
+      );
+    }
+  } catch (err) {
+    console.error(`[eval:${awemeId}] 失败:`, err);
+    markEvalFailed(id, dbi);
+  }
+}
 
 export interface Runner {
   kick(): void;
@@ -36,19 +71,7 @@ export function createRunner(opts: RunnerOptions = {}): Runner {
   let tickTimer: ReturnType<typeof setInterval> | null = null;
 
   async function processWork(work: ClaimedEvalWork): Promise<void> {
-    const { id, awemeId } = work;
-    const logPrefix = `[eval:${awemeId}]`;
-    try {
-      // TODO: Task 5 将注册 evaluateWorkWorkflow，届时替换此 stub
-      console.log(
-        `${logPrefix} workflow not yet implemented for work #${id}`
-      );
-      markEvalFailed(id, dbi);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`${logPrefix} ❌ 失败: ${errorMsg}`);
-      markEvalFailed(id, dbi);
-    }
+    await runEvalWorkflow(work, dbi);
   }
 
   async function worker(): Promise<void> {

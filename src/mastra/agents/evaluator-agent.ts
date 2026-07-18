@@ -1,7 +1,9 @@
 // src/mastra/agents/evaluator-agent.ts
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { Agent } from "@mastra/core/agent";
+import { Workspace, LocalFilesystem, LocalSandbox } from "@mastra/core/workspace";
 import { newapiModel } from "@/mastra/model";
 import { resolveAgentSkills } from "@/mastra/resolve-skills";
 
@@ -20,6 +22,9 @@ function detectPython(): string {
 
 const pythonCmd = detectPython();
 const workspaceDir = path.join(process.cwd(), "data", "workspace", "evaluator");
+
+// 确保工作区目录存在
+mkdirSync(workspaceDir, { recursive: true });
 
 const EVALUATOR_INSTRUCTIONS = `你是 A 股行情评判专家。给定抖音博主口播转写文本，你需要：
 
@@ -59,6 +64,11 @@ export const evaluatorAgent = new Agent({
   instructions: EVALUATOR_INSTRUCTIONS,
   model: newapiModel("evaluation"),
   skills: () => resolveAgentSkills("evaluatorAgent"),
-  // workspace 在 workflow 里按需挂载，agent 定义层不绑定 sandbox
-  // 子项目 B 的 evaluateWorkWorkflow 会创建 Workspace 传给 agent
+  workspace: new Workspace({
+    filesystem: new LocalFilesystem({ basePath: workspaceDir }),
+    sandbox: new LocalSandbox({
+      workingDirectory: workspaceDir,
+      timeout: 120_000,
+    }),
+  }),
 });
