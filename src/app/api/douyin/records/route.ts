@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         .select()
         .from(predictionItems)
         .where(inArray(predictionItems.workId, bloggerWorkIds))
-        .all() as PredictionItem[];
+        .all();
       // Backward compat: return array directly for blogger_slug queries
       return Response.json(items);
     }
@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
         .select()
         .from(predictionItems)
         .where(eq(predictionItems.workId, parsed))
-        .all() as PredictionItem[];
+        .all();
       return Response.json({ success: true, items });
     }
 
     // Return all items
-    items = db.select().from(predictionItems).all() as PredictionItem[];
+    items = db.select().from(predictionItems).all();
     return Response.json({ success: true, items });
   } catch (err) {
     return Response.json(

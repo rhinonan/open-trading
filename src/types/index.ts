@@ -1,3 +1,5 @@
+import type { bloggers, works, predictionItems } from "@/db/schema";
+
 // ==================== 股票相关 ====================
 
 export interface Stock {
@@ -113,50 +115,21 @@ export interface DashboardStats {
 
 // ==================== 抖音博主监控 ====================
 
-export type JudgmentResult =
-  | "correct"
-  | "mostly_correct"
-  | "incorrect"
-  | "not_applicable"
-  | "not_yet";
+// 行类型一律从 drizzle schema 派生（$inferSelect），杜绝手写类型与 schema 漂移。
+// 注意：上方必须是 import type —— schema 模块含运行时代码，值导入会进客户端 bundle。
+export type DouyinBlogger = typeof bloggers.$inferSelect;
+export type DouyinWork = typeof works.$inferSelect;
+export type PredictionItem = typeof predictionItems.$inferSelect;
+
+export type TranscriptStatus = DouyinWork["transcriptStatus"];
+export type JudgmentResult = PredictionItem["judgment"];
 
 export type SortDimension = "followers" | "recent" | "accuracy";
-
-export type TranscriptStatus = "pending" | "processing" | "done" | "failed";
-
-export interface DouyinBlogger {
-  id: number;
-  slug: string;
-  douyinUid: string;
-  nickname: string;
-  avatarUrl: string;
-  signature: string;
-  followerCount: number;
-  createdAt: number;
-  updatedAt: number;
-}
 
 export interface DouyinBloggerWithOpinion extends DouyinBlogger {
   latestOpinion: string;
   latestWorkAt: number | null;
   accuracy: number | null;
-}
-
-export interface DouyinWork {
-  id: number;
-  awemeId: string;
-  bloggerId: number;
-  desc: string;
-  transcript: string | null;
-  transcriptStatus: TranscriptStatus;
-  duration: number;
-  videoUrl: string | null;
-  opinionSummary: string;
-  coverUrl: string;
-  shareUrl: string;
-  statistics: string;
-  publishedAt: number;
-  scannedAt: number;
 }
 
 export interface WorkJudgment {
@@ -168,19 +141,6 @@ export interface WorkJudgment {
   notYet: number;
   notApplicable: number;
   latestItem: { judgment: string; predictedContent: string } | null;
-}
-
-export interface PredictionItem {
-  id: number;
-  workId: number;
-  predictedContent: string;
-  predictionTarget: string;
-  relatedSymbols: string;
-  judgment: JudgmentResult;
-  verifiableAfter: string | null;
-  reasoning: string;
-  evidence: string;
-  judgedAt: number;
 }
 
 export interface MarketSnapshot {

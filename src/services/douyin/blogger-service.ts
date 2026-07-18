@@ -14,7 +14,7 @@ export async function listBloggers(): Promise<DouyinBlogger[]> {
     .select()
     .from(bloggers)
     .orderBy(desc(bloggers.followerCount))
-    .all() as DouyinBlogger[];
+    .all();
 }
 
 export async function getBloggerBySlug(
@@ -25,7 +25,7 @@ export async function getBloggerBySlug(
     .from(bloggers)
     .where(eq(bloggers.slug, slug))
     .get();
-  return (result as DouyinBlogger) ?? null;
+  return result ?? null;
 }
 
 export async function addBlogger(douyinUid: string): Promise<DouyinBlogger> {
@@ -63,7 +63,7 @@ export async function addBlogger(douyinUid: string): Promise<DouyinBlogger> {
       followerCount: profile.follower_count || 0,
     })
     .returning()
-    .get() as DouyinBlogger;
+    .get();
 
   return blogger;
 }
@@ -79,7 +79,7 @@ export async function updateBloggerProfile(
     .select()
     .from(bloggers)
     .where(eq(bloggers.slug, slug))
-    .get() as DouyinBlogger | undefined;
+    .get();
   if (!blogger) throw new Error(`博主 ${slug} 不存在`);
 
   const profile = await fetchUserProfile(blogger.douyinUid);
@@ -105,7 +105,8 @@ export async function updateBloggerProfile(
     })
     .where(eq(bloggers.slug, slug))
     .returning()
-    .get() as DouyinBlogger;
+    .get();
+  if (!updated) throw new Error(`博主 ${slug} 更新失败`);
 
   return updated;
 }

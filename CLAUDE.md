@@ -70,5 +70,5 @@ API 有全局与单博主两套入口：`/api/douyin/{scan,transcribe,evaluate}`
 1. **API 缓存永不过期**：`src/lib/douyin-api.ts` 开启 `DOUYIN_CACHE_MODE` 后 `fetchUserPosts` 分页响应被永久冻结，扫描发现不了博主新作品；且 `writeCache` 无条件落盘，`data/api-cache/` 无限增长。缓存应定位为开发期回放，生产关闭或加 TTL。
 2. **API 路由成对复制**：全局/单博主路由重复（管线内部重复已在 2026-07 队列化改造中消除）。
 3. **扫描器 N+1**：`scanner-service.ts` 逐条查重 + 逐条插入，应批量 `inArray` 查重 + `onConflictDoNothing` 批量插入（`works` 常用索引已在队列化改造中补齐）。
-4. **类型断言绕过 Drizzle 推导**：`as DouyinBlogger[]` 等手写类型与 schema 会漂移，应改用 `$inferSelect` 派生；JSON 文本字段（`statistics` 等）建议在 service 边界加 zod 解析。
+4. **JSON 文本字段缺乏解析**：`statistics`、`evidence`、`relatedSymbols` 等 JSON 文本字段建议在 service 边界加 zod 解析（原类型断言问题已于 2026-07 修复：行类型改为 `$inferSelect` 派生）。
 5. **evaluator 为空壳**（有意暂缓，等行情数据源就绪）：当前 API 返回看似成功的空结果，建议改为明确的 disabled 标记，避免前端误判。

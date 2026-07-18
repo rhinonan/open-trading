@@ -16,7 +16,7 @@ export interface ScanResult {
 }
 
 export async function scanAllBloggers(): Promise<ScanResult[]> {
-  const allBloggers = db.select().from(bloggers).all() as DouyinBlogger[];
+  const allBloggers = db.select().from(bloggers).all();
 
   const results: ScanResult[] = [];
   for (const blogger of allBloggers) {
