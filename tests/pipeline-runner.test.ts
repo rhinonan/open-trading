@@ -146,6 +146,36 @@ describe("createRunner", () => {
     expect(row.transcriptStatus).toBe("done");
   });
 
+  it("last-microtask kick 不丢唤醒", async () => {
+    const dbi = createTestDb();
+    const b = seedBlogger(dbi);
+    const runner = createRunner({
+      dbi,
+      concurrency: 1,
+      processWork: async (w: ClaimedWork) => {
+        if (w.id === 1) {
+          // worker 完成后在 .finally() 触达前用 microtask 塞新任务
+          queueMicrotask(() => {
+            const w3 = seedWork(dbi, b);
+            runner.kick();
+          });
+        }
+        markDone(dbi, w.id);
+      },
+    });
+
+    // 放两条任务后 kick
+    seedWork(dbi, b, { scannedAt: 1 });
+    seedWork(dbi, b, { scannedAt: 2 });
+    runner.kick();
+    await vi.waitFor(() => expect(runner.isRunning()).toBe(false));
+
+    // 全表 done
+    const all = dbi.select().from(works).all();
+    expect(all.every((r) => r.transcriptStatus === "done")).toBe(true);
+    expect(all).toHaveLength(3); // 2 original + 1 injected
+  });
+
   it("kick 时顺带恢复僵尸 processing", async () => {
     const dbi = createTestDb();
     const b = seedBlogger(dbi);

@@ -55,21 +55,21 @@ export function createRunner(opts: RunnerOptions): Runner {
     } while (wake); // 运行期间有新 kick → 再扫一轮
   }
 
-  return {
-    kick() {
-      if (running) {
-        wake = true;
-        return;
-      }
-      running = true;
-      void loop()
-        .catch((err) => console.error("[pipeline-runner] loop crashed:", err))
-        .finally(() => {
-          running = false;
-        });
-    },
-    isRunning: () => running,
-  };
+  function kick() {
+    if (running) {
+      wake = true;
+      return;
+    }
+    running = true;
+    void loop()
+      .catch((err) => console.error("[pipeline-runner] loop crashed:", err))
+      .finally(() => {
+        running = false;
+        if (wake) kick();
+      });
+  }
+
+  return { kick, isRunning: () => running };
 }
 
 /** 真实任务执行：跑 Mastra 转写 workflow；自身消化所有错误（失败回写 DB），不抛出 */
