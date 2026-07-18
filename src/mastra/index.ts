@@ -9,6 +9,7 @@ import { skillReviewerAgent } from "@/mastra/agents/skill-reviewer-agent";
 import { transcribeWorkWorkflow } from "@/mastra/workflows/transcribe-work-workflow";
 import { evaluateWorkWorkflow } from "@/mastra/workflows/evaluate-work-workflow";
 import { skillReviewWorkflow } from "@/mastra/workflows/skill-review-workflow";
+import { analyzeImageWorkflow } from "@/mastra/workflows/analyze-image-workflow";
 import { dataPath } from "@/lib/data-root";
 
 // 绝对路径 + 正斜杠：与业务库 data/douyin.db 分离，
@@ -18,7 +19,7 @@ const storageUrl =
 
 export const mastra = new Mastra({
   agents: { opinionAgent, imageOpinionAgent, evaluatorAgent, skillReviewerAgent },
-  workflows: { transcribeWorkWorkflow, evaluateWorkWorkflow, skillReviewWorkflow },
+  workflows: { transcribeWorkWorkflow, evaluateWorkWorkflow, skillReviewWorkflow, analyzeImageWorkflow },
   storage: new LibSQLStore({
     id: "mastra-storage",
     url: storageUrl,
