@@ -44,47 +44,42 @@ export const works = sqliteTable(
       .default(sql`(unixepoch())`),
     // 最近一次被 runner 认领的时刻（unixepoch 秒）；null = 从未认领
     claimedAt: integer("claimed_at"),
+    // 评判状态（与 transcriptStatus 同构，复用队列模式）
+    evalStatus: text("eval_status", {
+      enum: ["none", "pending", "processing", "done", "failed"],
+    }).notNull().default("none"),
+    evalClaimedAt: integer("eval_claimed_at"),
+    evaluatedAt: integer("evaluated_at"),
   },
   (t) => [
     index("works_blogger_id_idx").on(t.bloggerId),
     index("works_transcript_status_idx").on(t.transcriptStatus),
+    index("works_eval_status_idx").on(t.evalStatus),
   ]
 );
 
-export const evaluations = sqliteTable("evaluations", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  bloggerId: integer("blogger_id")
-    .notNull()
-    .references(() => bloggers.id, { onDelete: "cascade" }),
-  evalDate: text("eval_date").notNull(),
-  worksCount: integer("works_count").notNull().default(0),
-  predictionSummary: text("prediction_summary").notNull().default(""),
-  accuracyScore: integer("accuracy_score").notNull().default(0),
-  evalDetail: text("eval_detail").notNull().default("{}"),
-  marketSnapshot: text("market_snapshot").notNull().default("{}"),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
-
 export const predictionItems = sqliteTable("prediction_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  evaluationId: integer("evaluation_id")
-    .notNull()
-    .references(() => evaluations.id, { onDelete: "cascade" }),
   workId: integer("work_id")
     .notNull()
     .references(() => works.id, { onDelete: "cascade" }),
   predictedContent: text("predicted_content").notNull(),
   predictionTarget: text("prediction_target").notNull().default(""),
-  predictionDetail: text("prediction_detail").notNull().default("{}"),
-  judgment: text("judgment", {
-    enum: ["correct", "mostly_correct", "incorrect", "not_applicable"],
-  })
-    .notNull()
-    .default("not_applicable"),
   relatedSymbols: text("related_symbols").notNull().default("[]"),
-});
+  judgment: text("judgment", {
+    enum: ["correct", "mostly_correct", "incorrect", "not_yet", "not_applicable"],
+  }).notNull(),
+  verifiableAfter: text("verifiable_after"),
+  reasoning: text("reasoning").notNull().default(""),
+  evidence: text("evidence").notNull().default("{}"),
+  judgedAt: integer("judged_at").notNull(),
+}, (t) => [
+  index("pred_items_work_id_idx").on(t.workId),
+  index("pred_items_judgment_idx").on(t.judgment),
+  index("pred_items_verifiable_idx").on(t.verifiableAfter).where(
+    sql`judgment = 'not_yet'`
+  ),
+]);
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
