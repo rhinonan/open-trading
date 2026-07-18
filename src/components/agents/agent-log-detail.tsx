@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Bot, AlertTriangle } from "lucide-react";
+import { Loader2, Bot, AlertTriangle, Clock } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -11,20 +11,18 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import type { SpanDetail } from "@/hooks/use-agent-logs";
+import type { SpanDetail, LogItem } from "@/hooks/use-agent-logs";
 
 interface AgentLogDetailProps {
   spans: SpanDetail[];
   loading: boolean;
   error: string;
+  log: LogItem | null;
 }
 
 /**
  * 从 span 的 input/output 中提取人类可读的文本。
- * Mastra observability 记录的 input/output 可能是：
- * - 直接的字符串
- * - { messages: [...] } 对象（AI SDK 格式）
- * - 其他 JSON 结构
+ * input/output 可能直接是字符串，也可能是 MessagePack 解码后的对象。
  */
 function extractText(value: unknown): string {
   if (value == null) return "";
@@ -58,19 +56,28 @@ function extractText(value: unknown): string {
   return String(value);
 }
 
-/** 找到 AGENT_RUN 类型的根 span，从中提取用户输入和 agent 输出 */
+/** 找到 AGENT_RUN 类型根 span，提取对话信息 */
 function findConversationSpans(spans: SpanDetail[]) {
   const rootSpan = spans.find(
     (s) => s.spanType === "agent_run" && !s.parentSpanId
   );
-  if (!rootSpan) return null;
-
-  const userInput = extractText(rootSpan.input);
-  const assistantOutput = extractText(rootSpan.output);
+  if (!rootSpan) {
+    // 兼容 workflow_run：直接用第一个 span
+    const first = spans[0];
+    if (!first) return null;
+    return {
+      userInput: extractText(first.input),
+      assistantOutput: extractText(first.output),
+      error: first.error,
+      entityName: first.entityName,
+      startedAt: first.startedAt,
+      endedAt: first.endedAt,
+    };
+  }
 
   return {
-    userInput,
-    assistantOutput,
+    userInput: extractText(rootSpan.input),
+    assistantOutput: extractText(rootSpan.output),
     error: rootSpan.error,
     entityName: rootSpan.entityName,
     startedAt: rootSpan.startedAt,
@@ -82,6 +89,7 @@ export function AgentLogDetail({
   spans,
   loading,
   error,
+  log,
 }: AgentLogDetailProps) {
   if (loading) {
     return (
@@ -105,18 +113,20 @@ export function AgentLogDetail({
     return (
       <ConversationEmptyState
         icon={<Bot className="size-12" />}
-        title="选择一条日志"
-        description="从左侧列表选择一条日志查看对话回放"
+        title="暂无对话内容"
+        description="该次调用没有记录到输入或输出"
       />
     );
   }
 
   return (
-    <div className="flex flex-col h-full rounded-lg border bg-card">
+    <div className="flex flex-col h-full">
       {/* 元信息条 */}
       <div className="flex items-center gap-3 px-4 py-2 border-b text-xs text-muted-foreground bg-muted/30">
         <span className="font-medium text-foreground">{conv.entityName}</span>
-        <span>{new Date(conv.startedAt).toLocaleString("zh-CN")}</span>
+        <span>
+          {new Date(conv.startedAt).toLocaleString("zh-CN")}
+        </span>
         {conv.endedAt && (
           <span>
             耗时{" "}
@@ -128,7 +138,23 @@ export function AgentLogDetail({
             s
           </span>
         )}
+        {log?.callSource && (
+          <span className="bg-secondary px-1.5 py-0.5 rounded">
+            {log.callSource === "chat"
+              ? "聊天"
+              : log.callSource === "workflow"
+                ? "工作流"
+                : "测试"}
+          </span>
+        )}
       </div>
+
+      {!conv.endedAt && !conv.error && (
+        <div className="flex items-center gap-2 px-4 py-2 text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20 border-b">
+          <Clock className="h-3 w-3" />
+          运行中…
+        </div>
+      )}
 
       <Conversation className="flex-1 min-h-0">
         <ConversationContent className="px-4 py-4">
@@ -147,11 +173,11 @@ export function AgentLogDetail({
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium text-sm">调用出错</p>
-                    <p className="text-xs mt-1">
+                    <pre className="text-xs mt-1 whitespace-pre-wrap font-mono">
                       {typeof conv.error === "string"
                         ? conv.error
                         : JSON.stringify(conv.error, null, 2)}
-                    </p>
+                    </pre>
                   </div>
                 </div>
               </MessageContent>
@@ -162,15 +188,7 @@ export function AgentLogDetail({
                 <MessageResponse>{conv.assistantOutput}</MessageResponse>
               </MessageContent>
             </Message>
-          ) : (
-            <Message from="assistant">
-              <MessageContent>
-                <span className="text-muted-foreground italic text-sm">
-                  运行中…
-                </span>
-              </MessageContent>
-            </Message>
-          )}
+          ) : null}
         </ConversationContent>
       </Conversation>
     </div>

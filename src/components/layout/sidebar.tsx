@@ -72,10 +72,13 @@ export function Sidebar() {
         <nav className="flex flex-col gap-1">
           <TooltipProvider delay={0}>
             {NAV_ITEMS.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
+              // 最长前缀匹配：/agents/logs 不会同时高亮 /agents
+              const matchingItem = NAV_ITEMS.filter(
+                (it) =>
+                  pathname === it.href ||
+                  pathname.startsWith(it.href + "/")
+              ).sort((a, b) => b.href.length - a.href.length)[0];
+              const isActive = item === matchingItem;
 
               const link = (
                 <Link

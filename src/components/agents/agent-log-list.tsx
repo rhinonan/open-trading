@@ -24,7 +24,10 @@ function formatDuration(startedAt: string, endedAt: string | null): string {
   if (!endedAt) return "—";
   const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
   if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.round((ms % 60000) / 1000);
+  return `${mins}m ${secs}s`;
 }
 
 function formatTime(iso: string): string {
@@ -83,10 +86,11 @@ export function AgentLogList({
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="py-2 pr-3 font-medium w-36">时间</th>
-              <th className="py-2 pr-3 font-medium">Agent</th>
+              <th className="py-2 pr-3 font-medium w-40">Agent / 工作流</th>
               <th className="py-2 pr-3 font-medium w-16">类型</th>
-              <th className="py-2 pr-3 font-medium w-16">状态</th>
+              <th className="py-2 pr-3 font-medium w-12">状态</th>
               <th className="py-2 pr-3 font-medium w-20 text-right">耗时</th>
+              <th className="py-2 pr-3 font-medium">输入摘要</th>
             </tr>
           </thead>
           <tbody>
@@ -105,9 +109,15 @@ export function AgentLogList({
                   <td className="py-2 pr-3 text-xs whitespace-nowrap">
                     {formatTime(log.startedAt)}
                   </td>
-                  <td className="py-2 pr-3 font-medium">{log.entityName}</td>
+                  <td className="py-2 pr-3 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate max-w-[180px]">
+                        {log.entityName}
+                      </span>
+                    </div>
+                  </td>
                   <td className="py-2 pr-3">
-                    <span className="text-xs bg-secondary px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-secondary px-1.5 py-0.5 rounded whitespace-nowrap">
                       {CALL_SOURCE_LABEL[log.callSource] ?? log.callSource}
                     </span>
                   </td>
@@ -120,8 +130,11 @@ export function AgentLogList({
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
                     )}
                   </td>
-                  <td className="py-2 pr-3 text-right text-xs text-muted-foreground">
+                  <td className="py-2 pr-3 text-right text-xs text-muted-foreground whitespace-nowrap">
                     {formatDuration(log.startedAt, log.endedAt)}
+                  </td>
+                  <td className="py-2 pr-3 text-xs text-muted-foreground max-w-xs truncate">
+                    {log.inputPreview}
                   </td>
                 </tr>
               );
@@ -134,7 +147,7 @@ export function AgentLogList({
         <div className="flex items-center justify-between pt-3 text-xs text-muted-foreground">
           <span>
             共 {pagination.total} 条，第 {pagination.page + 1} /{" "}
-            {Math.ceil(pagination.total / pagination.perPage)} 页
+            {Math.max(1, Math.ceil(pagination.total / pagination.perPage))} 页
           </span>
           <div className="flex gap-1">
             <button
