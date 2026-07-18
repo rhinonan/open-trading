@@ -3,8 +3,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getSetting, setSetting } from "@/services/settings-service";
+import { dataPath } from "@/lib/data-root";
 
-const SKILLS_DIR = path.join(process.cwd(), "data", "skills");
+const SKILLS_DIR = dataPath("skills");
 const MOUNTS_KEY = "skills_agent_mounts";
 
 export interface SkillMeta {

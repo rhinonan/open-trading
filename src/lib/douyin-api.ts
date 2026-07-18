@@ -2,10 +2,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { dataPath } from "@/lib/data-root";
 
 const TIKHUB_BASE = process.env.TIKHUB_BASE || "https://api.tikhub.io";
 const TIKHUB_API_KEY = process.env.TIKHUB_API_KEY || "";
-const CACHE_DIR = path.join(process.cwd(), "data", "api-cache");
+const CACHE_DIR = dataPath("api-cache");
 const CACHE_MODE = process.env.DOUYIN_CACHE_MODE === "true";
 
 function cacheKey(endpoint: string, options?: RequestInit): string {

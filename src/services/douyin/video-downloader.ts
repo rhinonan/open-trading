@@ -2,8 +2,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fetchOneVideo } from "@/lib/douyin-api";
+import { dataPath } from "@/lib/data-root";
 
-const VIDEOS_DIR = path.join(process.cwd(), "data", "videos");
+const VIDEOS_DIR = dataPath("videos");
 
 function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) {

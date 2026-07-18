@@ -1,11 +1,11 @@
 // src/mastra/agents/evaluator-agent.ts
-import path from "node:path";
 import { mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { Agent } from "@mastra/core/agent";
 import { Workspace, LocalFilesystem, LocalSandbox } from "@mastra/core/workspace";
 import { newapiModel } from "@/mastra/model";
 import { resolveAgentSkills } from "@/mastra/resolve-skills";
+import { dataPath } from "@/lib/data-root";
 
 // 探测可用 python 命令（dev：python，容器：python3）
 function detectPython(): string {
@@ -21,7 +21,7 @@ function detectPython(): string {
 }
 
 const pythonCmd = detectPython();
-const workspaceDir = path.join(process.cwd(), "data", "workspace", "evaluator");
+const workspaceDir = dataPath("workspace", "evaluator");
 
 // 确保工作区目录存在
 mkdirSync(workspaceDir, { recursive: true });

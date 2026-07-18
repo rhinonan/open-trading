@@ -2,8 +2,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { spawn } from "child_process";
+import { dataPath } from "@/lib/data-root";
 
-const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
+const AUDIO_DIR = dataPath("audio");
 
 function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) {

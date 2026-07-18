@@ -1,9 +1,9 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
-import path from "path";
+import { dataPath } from "@/lib/data-root";
 
-const DB_PATH = path.join(process.cwd(), "data", "douyin.db");
+const DB_PATH = dataPath("douyin.db");
 
 const sqlite = new Database(DB_PATH);
 sqlite.pragma("journal_mode = WAL");
