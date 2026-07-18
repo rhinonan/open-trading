@@ -9,11 +9,13 @@ import { DEFAULT_LLM_MODEL } from "@/lib/llm-constants";
 interface LlmSettings {
   opinionModel: string;
   evaluationModel: string;
+  skillsReviewModel: string;
 }
 
 const MODEL_FIELDS: { field: keyof LlmSettings; label: string; hint: string }[] = [
   { field: "opinionModel", label: "观点提取模型", hint: "转写文本 → 一句话观点摘要" },
   { field: "evaluationModel", label: "收盘评判模型", hint: "预测 vs 实际行情评判（功能待启用）" },
+  { field: "skillsReviewModel", label: "Skills 审查模型", hint: "Skill 安装时的安全/协议/执行边界审查" },
 ];
 
 export default function SettingsPage() {
