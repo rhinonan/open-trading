@@ -35,7 +35,7 @@ function parseFrontmatter(md: string): { name?: string; description?: string; ve
 }
 
 function enabledFlagPath(name: string): string {
-  return path.join(SKILLS_DIR, name, ".enabled");
+  return path.join(skillDir(name), ".enabled");
 }
 
 function simpleHash(s: string): string {
@@ -45,29 +45,40 @@ function simpleHash(s: string): string {
   return h.toString(16);
 }
 
+function validateSkillName(name: string): void {
+  if (!name || name.includes("..") || name.includes("/") || name.includes("\\")) {
+    throw new Error(`无效的 Skill 名称: "${name}"`);
+  }
+}
+
+function skillDir(name: string): string {
+  validateSkillName(name);
+  const dir = path.resolve(SKILLS_DIR, name);
+  if (!dir.startsWith(path.resolve(SKILLS_DIR) + path.sep) && dir !== path.resolve(SKILLS_DIR)) {
+    throw new Error(`Skill 路径超出范围: "${name}"`);
+  }
+  return dir;
+}
+
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
-  const match = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
+  const match = url.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
   if (!match) return null;
   return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
 }
 
-// GitHub API request for endpoints returning JSON
-async function ghApi(pathStr: string): Promise<any> {
+interface GitHubRepo { default_branch: string }
+interface GitHubTreeEntry { path: string; type: string }
+interface GitHubTree { tree: GitHubTreeEntry[] }
+interface GitHubContent { content: string; encoding: string }
+
+// GitHub API request
+async function githubApi(pathStr: string): Promise<any> {
   const res = await fetch(`https://api.github.com${pathStr}`, {
     headers: { Accept: "application/vnd.github+json", "User-Agent": "open-trading/1.0" },
   });
   if (!res.ok) {
     throw new Error(`GitHub API ${res.status}: ${res.statusText} -- ${pathStr}`);
   }
-  return res.json();
-}
-
-// GitHub API request for contents endpoint (returns JSON with base64 content)
-async function ghApiRaw(pathStr: string): Promise<any> {
-  const res = await fetch(`https://api.github.com${pathStr}`, {
-    headers: { Accept: "application/vnd.github+json", "User-Agent": "open-trading/1.0" },
-  });
-  if (!res.ok) throw new Error(`GitHub API ${res.status}: ${res.statusText} -- ${pathStr}`);
   return res.json();
 }
 
@@ -84,18 +95,18 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
   const { owner, repo } = parsed;
 
   // 1. Get default branch
-  const repoMeta = await ghApi(`/repos/${owner}/${repo}`);
+  const repoMeta = await githubApi(`/repos/${owner}/${repo}`);
   const defaultBranch = repoMeta.default_branch;
 
   // 2. Get file tree (recursive)
-  const tree = await ghApi(`/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
+  const tree = await githubApi(`/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
 
   // 3. Find SKILL.md
   const skillMdEntry = tree.tree.find((e: { path: string }) => e.path === "SKILL.md");
   if (!skillMdEntry) throw new Error("仓库中未找到 SKILL.md");
 
   // 4. Fetch SKILL.md content
-  const skillContent = await ghApiRaw(`/repos/${owner}/${repo}/contents/SKILL.md?ref=${defaultBranch}`);
+  const skillContent = await githubApi(`/repos/${owner}/${repo}/contents/SKILL.md?ref=${defaultBranch}`);
   const skillMd = Buffer.from(skillContent.content, "base64").toString("utf-8");
   const front = parseFrontmatter(skillMd);
   if (!front?.name || !front?.description) {
@@ -103,13 +114,13 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
   }
 
   // 5. Write to data/skills/<name>/
-  const skillDir = path.join(SKILLS_DIR, front.name);
+  const installDir = skillDir(front.name);
   ensureSkillsDir();
-  if (fs.existsSync(skillDir)) {
+  if (fs.existsSync(installDir)) {
     throw new Error(`Skill "${front.name}" 已存在，请先删除`);
   }
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.writeFileSync(path.join(skillDir, "SKILL.md"), skillMd, "utf-8");
+  fs.mkdirSync(installDir, { recursive: true });
+  fs.writeFileSync(path.join(installDir, "SKILL.md"), skillMd, "utf-8");
 
   // 6. Write .meta.json
   const meta: SkillMeta = {
@@ -121,7 +132,7 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
     enabled: false, // default disabled
     contentHash: simpleHash(skillMd),
   };
-  fs.writeFileSync(path.join(skillDir, ".meta.json"), JSON.stringify(meta, null, 2), "utf-8");
+  fs.writeFileSync(path.join(installDir, ".meta.json"), JSON.stringify(meta, null, 2), "utf-8");
 
   // No .enabled file written -> dynamic resolver will skip
 
@@ -129,9 +140,9 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
   for (const entry of tree.tree) {
     if (entry.path === "SKILL.md" || entry.type !== "blob") continue;
     if (entry.path.includes(".github")) continue; // skip CI/templates
-    const content = await ghApiRaw(`/repos/${owner}/${repo}/contents/${entry.path}?ref=${defaultBranch}`);
+    const content = await githubApi(`/repos/${owner}/${repo}/contents/${entry.path}?ref=${defaultBranch}`);
     if (typeof content.content !== "string") continue; // skip binary files
-    const destPath = path.join(skillDir, entry.path);
+    const destPath = path.join(installDir, entry.path);
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
     fs.writeFileSync(destPath, Buffer.from(content.content, "base64").toString("utf-8"), "utf-8");
   }
@@ -162,9 +173,9 @@ export function listSkills(): SkillMeta[] {
 
 /** Get a single skill with its SKILL.md content. Returns null if missing or broken. */
 export function getSkill(name: string): (SkillMeta & { content: string }) | null {
-  const skillDir = path.join(SKILLS_DIR, name);
-  const metaPath = path.join(skillDir, ".meta.json");
-  const skillMdPath = path.join(skillDir, "SKILL.md");
+  const dir = skillDir(name);
+  const metaPath = path.join(dir, ".meta.json");
+  const skillMdPath = path.join(dir, "SKILL.md");
   if (!fs.existsSync(metaPath) || !fs.existsSync(skillMdPath)) return null;
   try {
     const meta: SkillMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
@@ -178,8 +189,8 @@ export function getSkill(name: string): (SkillMeta & { content: string }) | null
 
 /** Enable a skill by writing a .enabled marker file. */
 export function enableSkill(name: string): void {
-  const skillDir = path.join(SKILLS_DIR, name);
-  if (!fs.existsSync(skillDir)) throw new Error(`Skill "${name}" 不存在`);
+  const dir = skillDir(name);
+  if (!fs.existsSync(dir)) throw new Error(`Skill "${name}" 不存在`);
   fs.writeFileSync(enabledFlagPath(name), "", "utf-8");
 }
 
@@ -191,9 +202,9 @@ export function disableSkill(name: string): void {
 
 /** Delete a skill directory entirely. */
 export function deleteSkill(name: string): void {
-  const skillDir = path.join(SKILLS_DIR, name);
-  if (!fs.existsSync(skillDir)) throw new Error(`Skill "${name}" 不存在`);
-  fs.rmSync(skillDir, { recursive: true, force: true });
+  const dir = skillDir(name);
+  if (!fs.existsSync(dir)) throw new Error(`Skill "${name}" 不存在`);
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 /** Check upstream for a newer version of an installed skill. */
@@ -210,8 +221,8 @@ export async function checkUpdate(name: string): Promise<{
   if (!parsed) throw new Error("来源 URL 格式不支持");
 
   const { owner, repo } = parsed;
-  const repoMeta = await ghApi(`/repos/${owner}/${repo}`);
-  const skillContent = await ghApiRaw(
+  const repoMeta = await githubApi(`/repos/${owner}/${repo}`);
+  const skillContent = await githubApi(
     `/repos/${owner}/${repo}/contents/SKILL.md?ref=${repoMeta.default_branch}`,
   );
   const latestMd = Buffer.from(skillContent.content, "base64").toString("utf-8");
