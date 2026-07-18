@@ -35,8 +35,23 @@ export interface SkillReviewResult {
 }
 
 export interface StagingFile {
-  path: string;       // 相对于 skill 根目录的路径
+  path: string;       // 相对于 batch 根目录的路径
   content: string | null; // null = 二进制文件，跳过内容审查
+}
+
+export interface SkillCandidate {
+  name: string;
+  description: string;
+  version: string;
+  sourcePath: string; // "SKILL.md" or "skills/foo/SKILL.md"
+}
+
+export interface StagingBatch {
+  batchId: string;
+  sourceUrl: string;
+  installedAt: string;
+  candidates: SkillCandidate[];
+  review: SkillReviewResult;
 }
 
 function ensureSkillsDir(): void {
@@ -88,17 +103,21 @@ function skillDir(name: string): string {
   return dir;
 }
 
-function stagingDir(name: string): string {
-  validateSkillName(name);
-  const dir = path.resolve(STAGING_DIR, name);
+function stagingDir(batchId: string): string {
+  validateSkillName(batchId);
+  const dir = path.resolve(STAGING_DIR, batchId);
   if (!dir.startsWith(path.resolve(STAGING_DIR) + path.sep) && dir !== path.resolve(STAGING_DIR)) {
-    throw new Error(`Staging 路径超出范围: "${name}"`);
+    throw new Error(`Staging 路径超出范围: "${batchId}"`);
   }
   return dir;
 }
 
-function reviewPath(name: string): string {
-  return path.join(stagingDir(name), ".review.json");
+function batchPath(batchId: string): string {
+  return path.join(stagingDir(batchId), ".batch.json");
+}
+
+function candidateDir(batchId: string, name: string): string {
+  return path.join(stagingDir(batchId), "skills", name);
 }
 
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
@@ -282,8 +301,8 @@ export async function checkUpdate(name: string): Promise<{
 // Staging operations (install → review → publish)
 // ----------------------------------------------------------------
 
-/** Install a skill from GitHub to the staging directory. Same logic as installFromUrl but lands in data/skills-staging/. */
-export async function installToStaging(url: string): Promise<{ name: string; version: string }> {
+/** Install skills from a GitHub repo to staging. Scans root and skills/ dir for SKILL.md files. */
+export async function installToStaging(url: string): Promise<StagingBatch> {
   const parsed = parseGitHubUrl(url);
   if (!parsed) {
     throw new Error("仅支持 public GitHub 仓库 URL（github.com/<owner>/<repo> 格式）");
@@ -295,74 +314,122 @@ export async function installToStaging(url: string): Promise<{ name: string; ver
 
   const tree = await githubApi(`/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
 
-  const skillMdEntry = tree.tree.find((e: { path: string }) => e.path === "SKILL.md");
-  if (!skillMdEntry) throw new Error("仓库中未找到 SKILL.md");
-
-  const skillContent = await githubApi(`/repos/${owner}/${repo}/contents/SKILL.md?ref=${defaultBranch}`);
-  const skillMd = Buffer.from(skillContent.content, "base64").toString("utf-8");
-  const front = parseFrontmatter(skillMd);
-  if (!front?.name || !front?.description) {
-    throw new Error("SKILL.md 缺少必填字段 name/description");
+  // 找出所有 SKILL.md：根目录 + skills/*/SKILL.md
+  const skillMdPaths: string[] = [];
+  if (tree.tree.some((e: { path: string }) => e.path === "SKILL.md")) {
+    skillMdPaths.push("SKILL.md");
   }
-
-  const installDir = stagingDir(front.name);
-  ensureStagingDir();
-  if (fs.existsSync(installDir)) {
-    throw new Error(`Skill "${front.name}" 已在暂存区，请先处理`);
-  }
-  fs.mkdirSync(installDir, { recursive: true });
-  fs.writeFileSync(path.join(installDir, "SKILL.md"), skillMd, "utf-8");
-
-  const meta: SkillMeta = {
-    name: front.name,
-    description: front.description,
-    version: front.version ?? "0.0.0",
-    sourceUrl: url,
-    installedAt: new Date().toISOString(),
-    enabled: false,
-    contentHash: simpleHash(skillMd),
-  };
-  fs.writeFileSync(path.join(installDir, ".meta.json"), JSON.stringify(meta, null, 2), "utf-8");
-
-  // 初始审查状态
-  const initialReview: SkillReviewResult = {
-    status: "pending",
-    reviewedAt: null,
-    verdict: "reject",
-    summary: "",
-    issues: [],
-  };
-  fs.writeFileSync(reviewPath(front.name), JSON.stringify(initialReview, null, 2), "utf-8");
-
-  // 附属文件
+  const seenNames = new Set<string>();
   for (const entry of tree.tree) {
-    if (entry.path === "SKILL.md" || entry.type !== "blob") continue;
+    if (!entry.path.startsWith("skills/") || !entry.path.endsWith("/SKILL.md")) continue;
+    const inner = entry.path.slice("skills/".length);
+    const skillName = inner.slice(0, inner.indexOf("/"));
+    if (skillName && !seenNames.has(skillName)) {
+      skillMdPaths.push(entry.path);
+      seenNames.add(skillName);
+    }
+  }
+  if (skillMdPaths.length === 0) {
+    throw new Error("仓库根目录和 skills/ 目录下均未找到 SKILL.md");
+  }
+
+  const batchId = repo;
+  const batchDir = stagingDir(batchId);
+  ensureStagingDir();
+  if (fs.existsSync(batchDir)) {
+    throw new Error(`仓库 "${batchId}" 已在暂存区，请先处理`);
+  }
+  fs.mkdirSync(batchDir, { recursive: true });
+
+  // 解析每个 SKILL.md → candidates
+  const candidates: SkillCandidate[] = [];
+  for (const mdPath of skillMdPaths) {
+    const content = await githubApi(`/repos/${owner}/${repo}/contents/${mdPath}?ref=${defaultBranch}`);
+    const md = Buffer.from(content.content, "base64").toString("utf-8");
+    const front = parseFrontmatter(md);
+    if (!front?.name || !front?.description) {
+      throw new Error(`${mdPath} 缺少必填字段 name/description`);
+    }
+    // 检查 candidate 名称唯一性
+    if (candidates.some((c) => c.name === front.name)) {
+      throw new Error(`Skill 名称 "${front.name}" 重复`);
+    }
+    const dir = candidateDir(batchId, front.name!);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "SKILL.md"), md, "utf-8");
+    // candidate 元数据
+    const candidateMeta: SkillMeta = {
+      name: front.name!,
+      description: front.description!,
+      version: front.version ?? "0.0.0",
+      sourceUrl: url,
+      installedAt: new Date().toISOString(),
+      enabled: false,
+      contentHash: simpleHash(md),
+    };
+    fs.writeFileSync(path.join(dir, ".candidate.json"), JSON.stringify(candidateMeta, null, 2), "utf-8");
+    candidates.push({
+      name: front.name!,
+      description: front.description!,
+      version: front.version ?? "0.0.0",
+      sourcePath: mdPath,
+    });
+  }
+
+  // 附属文件（共享文件：LICENSE、scripts 等；跳过已处理的 SKILL.md 和 skills/ 下 SKILL.md）
+  const handledPaths = new Set(skillMdPaths);
+  for (const entry of tree.tree) {
+    if (entry.type !== "blob") continue;
+    if (handledPaths.has(entry.path)) continue;
     if (entry.path.includes(".github")) continue;
+    // 跳过 skills/<name>/ 下的文件（已经在 candidate dir 中）
+    if (entry.path.startsWith("skills/")) {
+      const inner = entry.path.slice("skills/".length);
+      const slashIdx = inner.indexOf("/");
+      if (slashIdx !== -1) {
+        const skillName = inner.slice(0, slashIdx);
+        if (candidates.some((c) => c.name === skillName)) {
+          // 附属文件 belong to that candidate
+          const content = await githubApi(`/repos/${owner}/${repo}/contents/${entry.path}?ref=${defaultBranch}`);
+          if (typeof content.content !== "string") continue;
+          const destPath = path.join(candidateDir(batchId, skillName), inner.slice(slashIdx + 1));
+          fs.mkdirSync(path.dirname(destPath), { recursive: true });
+          fs.writeFileSync(destPath, Buffer.from(content.content, "base64").toString("utf-8"), "utf-8");
+          continue;
+        }
+      }
+    }
+    // 其他共享文件（LICENSE 等）
     const content = await githubApi(`/repos/${owner}/${repo}/contents/${entry.path}?ref=${defaultBranch}`);
     if (typeof content.content !== "string") continue;
-    const destPath = path.join(installDir, entry.path);
+    const destPath = path.join(batchDir, entry.path);
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
     fs.writeFileSync(destPath, Buffer.from(content.content, "base64").toString("utf-8"), "utf-8");
   }
 
-  return { name: front.name, version: front.version ?? "0.0.0" };
+  // 批次元数据
+  const batch: StagingBatch = {
+    batchId,
+    sourceUrl: url,
+    installedAt: new Date().toISOString(),
+    candidates,
+    review: { status: "pending", reviewedAt: null, verdict: "reject", summary: "", issues: [] },
+  };
+  fs.writeFileSync(batchPath(batchId), JSON.stringify(batch, null, 2), "utf-8");
+
+  return batch;
 }
 
-/** List all items in staging with their review status. */
-export function listStaging(): (SkillMeta & { review: SkillReviewResult })[] {
+/** List all staging batches with their review status. */
+export function listStaging(): StagingBatch[] {
   ensureStagingDir();
-  const result: (SkillMeta & { review: SkillReviewResult })[] = [];
+  const result: StagingBatch[] = [];
   for (const entry of fs.readdirSync(STAGING_DIR, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const metaPath = path.join(STAGING_DIR, entry.name, ".meta.json");
-    const reviewFilePath = reviewPath(entry.name);
-    if (!fs.existsSync(metaPath)) continue;
+    const bp = batchPath(entry.name);
+    if (!fs.existsSync(bp)) continue;
     try {
-      const meta: SkillMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      const review: SkillReviewResult = fs.existsSync(reviewFilePath)
-        ? JSON.parse(fs.readFileSync(reviewFilePath, "utf-8"))
-        : { status: "pending", reviewedAt: null, verdict: "reject", summary: "", issues: [] };
-      result.push({ ...meta, review });
+      result.push(JSON.parse(fs.readFileSync(bp, "utf-8")));
     } catch {
       continue;
     }
@@ -370,27 +437,23 @@ export function listStaging(): (SkillMeta & { review: SkillReviewResult })[] {
   return result;
 }
 
-/** Get a single staging item with all file contents. */
-export function getStaging(name: string): (SkillMeta & { review: SkillReviewResult; files: StagingFile[] }) | null {
-  const dir = stagingDir(name);
-  const metaPath = path.join(dir, ".meta.json");
-  if (!fs.existsSync(metaPath)) return null;
+/** Get a single staging batch with all file contents for review. */
+export function getStaging(batchId: string): (StagingBatch & { files: StagingFile[] }) | null {
+  const bp = batchPath(batchId);
+  if (!fs.existsSync(bp)) return null;
   try {
-    const meta: SkillMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-    const review: SkillReviewResult = fs.existsSync(reviewPath(name))
-      ? JSON.parse(fs.readFileSync(reviewPath(name), "utf-8"))
-      : { status: "pending", reviewedAt: null, verdict: "reject", summary: "", issues: [] };
-    const files = getStagingFilesFromDir(dir);
-    return { ...meta, review, files };
+    const batch: StagingBatch = JSON.parse(fs.readFileSync(bp, "utf-8"));
+    const files = getStagingFilesFromDir(stagingDir(batchId));
+    return { ...batch, files };
   } catch {
     return null;
   }
 }
 
-/** Walk staging directory, returning all text file contents. Binary files get content=null. */
-export function getStagingFiles(name: string): StagingFile[] {
-  const dir = stagingDir(name);
-  if (!fs.existsSync(dir)) throw new Error(`Staging 中未找到 "${name}"`);
+/** Walk batch directory, returning all text file contents. Binary files get content=null. */
+export function getStagingFiles(batchId: string): StagingFile[] {
+  const dir = stagingDir(batchId);
+  if (!fs.existsSync(dir)) throw new Error(`Staging 中未找到 "${batchId}"`);
   return getStagingFilesFromDir(dir);
 }
 
@@ -441,37 +504,65 @@ function isUtf8File(buf: Buffer): boolean {
   }
 }
 
-/** Promote a staging item to the permanent skills directory. Requires review verdict=pass. */
-export function publishStaging(name: string): void {
-  const src = stagingDir(name);
-  if (!fs.existsSync(src)) throw new Error(`Staging 中未找到 "${name}"`);
-  const dest = skillDir(name);
-  if (fs.existsSync(dest)) throw new Error(`Skill "${name}" 已存在，请先删除再发布`);
-  const rp = reviewPath(name);
-  if (fs.existsSync(rp)) {
-    const review: SkillReviewResult = JSON.parse(fs.readFileSync(rp, "utf-8"));
-    if (review.verdict !== "pass") {
-      throw new Error(`Skill "${name}" 审查未通过，无法发布`);
-    }
-  } else {
-    throw new Error(`Skill "${name}" 未完成审查，无法发布`);
+/** Publish selected candidates from a batch to permanent skills directory. Requires review verdict=pass. */
+export function publishCandidates(batchId: string, names: string[]): string[] {
+  const bp = batchPath(batchId);
+  if (!fs.existsSync(bp)) throw new Error(`Staging 中未找到 "${batchId}"`);
+  const batch: StagingBatch = JSON.parse(fs.readFileSync(bp, "utf-8"));
+  if (batch.review.verdict !== "pass") {
+    throw new Error(`批次 "${batchId}" 审查未通过，无法发布`);
   }
+
+  const published: string[] = [];
+  const errors: string[] = [];
   ensureSkillsDir();
-  fs.renameSync(src, dest);
+
+  for (const name of names) {
+    const candidate = batch.candidates.find((c) => c.name === name);
+    if (!candidate) {
+      errors.push(`"${name}" 不在候选列表中`);
+      continue;
+    }
+    const src = candidateDir(batchId, name);
+    const dest = skillDir(name);
+    if (fs.existsSync(dest)) {
+      errors.push(`Skill "${name}" 已存在`);
+      continue;
+    }
+    fs.renameSync(src, dest);
+    published.push(name);
+  }
+
+  // 更新 batch，移除已发布的 candidate
+  const remaining = batch.candidates.filter((c) => !published.includes(c.name));
+  if (remaining.length === 0) {
+    // 全部发布，清理 batch
+    fs.rmSync(stagingDir(batchId), { recursive: true, force: true });
+  } else {
+    batch.candidates = remaining;
+    fs.writeFileSync(bp, JSON.stringify(batch, null, 2), "utf-8");
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors.join("; "));
+  }
+  return published;
 }
 
-/** Discard a staging item entirely. */
-export function discardStaging(name: string): void {
-  const dir = stagingDir(name);
-  if (!fs.existsSync(dir)) throw new Error(`Staging 中未找到 "${name}"`);
+/** Discard a staging batch entirely. */
+export function discardStaging(batchId: string): void {
+  const dir = stagingDir(batchId);
+  if (!fs.existsSync(dir)) throw new Error(`Staging 中未找到 "${batchId}"`);
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/** Write review result to the staging item's .review.json. */
-export function writeReviewResult(name: string, result: SkillReviewResult): void {
-  const dir = stagingDir(name);
-  if (!fs.existsSync(dir)) throw new Error(`Staging 中未找到 "${name}"`);
-  fs.writeFileSync(reviewPath(name), JSON.stringify(result, null, 2), "utf-8");
+/** Write review result to the batch's .batch.json. */
+export function writeReviewResult(batchId: string, result: SkillReviewResult): void {
+  const bp = batchPath(batchId);
+  if (!fs.existsSync(bp)) throw new Error(`Staging 中未找到 "${batchId}"`);
+  const batch: StagingBatch = JSON.parse(fs.readFileSync(bp, "utf-8"));
+  batch.review = result;
+  fs.writeFileSync(bp, JSON.stringify(batch, null, 2), "utf-8");
 }
 
 // ----------------------------------------------------------------

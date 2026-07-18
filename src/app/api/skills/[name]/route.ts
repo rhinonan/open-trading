@@ -44,9 +44,9 @@ export async function DELETE(
 ) {
   try {
     const { name } = await ctx.params;
-    // 检查 staging 中是否存在同名项目
+    // 检查 staging 中是否存在同名批次
     const stagingItems = skillService.listStaging();
-    const inStaging = stagingItems.find(s => s.name === name);
+    const inStaging = stagingItems.find(s => s.batchId === name);
     if (inStaging) {
       skillService.discardStaging(name);
       return Response.json({ success: true });

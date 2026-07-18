@@ -7,9 +7,9 @@ export async function POST(
   ctx: { params: Promise<{ name: string }> },
 ) {
   try {
-    const { name } = await ctx.params;
+    const { name: batchId } = await ctx.params;
     const run = await mastra.getWorkflow("skillReviewWorkflow").createRun();
-    const result = await run.start({ inputData: { name } });
+    const result = await run.start({ inputData: { batchId } });
     return Response.json({ success: true, ...result });
   } catch (err) {
     return Response.json(

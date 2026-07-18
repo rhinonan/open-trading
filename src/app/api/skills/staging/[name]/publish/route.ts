@@ -3,13 +3,17 @@ import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ name: string }> },
 ) {
   try {
-    const { name } = await ctx.params;
-    skillService.publishStaging(name);
-    return Response.json({ success: true });
+    const { name: batchId } = await ctx.params;
+    const { names } = await req.json();
+    if (!names || !Array.isArray(names) || names.length === 0) {
+      return Response.json({ success: false, error: "请提供要安装的 skill 名称列表" }, { status: 400 });
+    }
+    const published = skillService.publishCandidates(batchId, names);
+    return Response.json({ success: true, published });
   } catch (err) {
     return Response.json(
       { success: false, error: err instanceof Error ? err.message : "发布失败" },

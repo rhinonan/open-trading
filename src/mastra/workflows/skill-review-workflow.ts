@@ -9,7 +9,7 @@ import {
 } from "@/services/skills-service";
 
 const workflowInputSchema = z.object({
-  name: z.string().describe("staging 中的 skill 名称"),
+  batchId: z.string().describe("staging 中的批次 ID"),
 });
 
 type WorkflowInput = z.infer<typeof workflowInputSchema>;
@@ -41,17 +41,17 @@ const prepareStep = createStep({
   id: "review-prepare",
   inputSchema: workflowInputSchema,
   outputSchema: z.object({
-    name: z.string(),
+    batchId: z.string(),
     prompt: z.string(),
     fileCount: z.number(),
     totalChars: z.number(),
   }),
   execute: async ({ inputData }) => {
-    const { name } = inputData;
-    const files = getStagingFiles(name);
+    const { batchId } = inputData;
+    const files = getStagingFiles(batchId);
 
     const parts: string[] = [
-      `## 待审查 Skill: ${name}`,
+      `## 待审查批次: ${batchId}`,
       "",
     ];
 
@@ -72,7 +72,7 @@ const prepareStep = createStep({
     }
 
     const prompt = parts.join("\n");
-    return { name, prompt, fileCount: files.length, totalChars };
+    return { batchId, prompt, fileCount: files.length, totalChars };
   },
 });
 
@@ -80,7 +80,7 @@ const prepareStep = createStep({
 const reviewStep = createStep({
   id: "review-agent",
   inputSchema: z.object({
-    name: z.string(),
+    batchId: z.string(),
     prompt: z.string(),
     fileCount: z.number(),
     totalChars: z.number(),
@@ -88,12 +88,12 @@ const reviewStep = createStep({
   outputSchema: reviewOutputSchema,
   retries: 1,
   execute: async ({ inputData }) => {
-    const { name, prompt } = inputData;
+    const { batchId, prompt } = inputData;
     console.log(
-      `[review:${name}] 开始审查，${inputData.fileCount} 个文件，共 ${inputData.totalChars} 字符`,
+      `[review:${batchId}] 开始审查，${inputData.fileCount} 个文件，共 ${inputData.totalChars} 字符`,
     );
 
-    const fullPrompt = `${prompt}\n\n请对以上 Skill "${name}" 进行安全审查，严格按照 JSON schema 输出审查结果。`;
+    const fullPrompt = `${prompt}\n\n请对以上批次 "${batchId}" 中的所有 Skill 进行安全审查，严格按照 JSON schema 输出审查结果。`;
 
     const result = await skillReviewerAgent.generate(fullPrompt, {
       structuredOutput: { schema: reviewOutputSchema },
@@ -108,17 +108,17 @@ const reviewStep = createStep({
   },
 });
 
-// Step 3: persist — 写 .review.json
+// Step 3: persist — 写 .batch.json
 const persistStep = createStep({
   id: "review-persist",
   inputSchema: reviewOutputSchema,
   outputSchema: z.object({
     status: z.enum(["passed", "rejected"]),
-    name: z.string(),
+    batchId: z.string(),
     summary: z.string(),
   }),
   execute: async ({ inputData, getInitData }) => {
-    const { name } = getInitData<WorkflowInput>();
+    const { batchId } = getInitData<WorkflowInput>();
     const { verdict, summary, issues } = inputData;
 
     const result: SkillReviewResult = {
@@ -134,12 +134,12 @@ const persistStep = createStep({
       })),
     };
 
-    writeReviewResult(name, result);
+    writeReviewResult(batchId, result);
     console.log(
-      `[review:${name}] 审查${verdict === "pass" ? "通过" : "不通过"}: ${summary}`,
+      `[review:${batchId}] 审查${verdict === "pass" ? "通过" : "不通过"}: ${summary}`,
     );
     const status = verdict === "pass" ? "passed" as const : "rejected" as const;
-    return { status, name, summary };
+    return { status, batchId, summary };
   },
 });
 
@@ -148,7 +148,7 @@ export const skillReviewWorkflow = createWorkflow({
   inputSchema: workflowInputSchema,
   outputSchema: z.object({
     status: z.enum(["passed", "rejected"]),
-    name: z.string(),
+    batchId: z.string(),
     summary: z.string(),
   }),
 })

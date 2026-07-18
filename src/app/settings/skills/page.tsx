@@ -48,7 +48,18 @@ interface SkillReviewResult {
   issues: ReviewIssue[];
 }
 
-interface StagingItem extends SkillMeta {
+interface SkillCandidate {
+  name: string;
+  description: string;
+  version: string;
+  sourcePath: string;
+}
+
+interface StagingBatch {
+  batchId: string;
+  sourceUrl: string;
+  installedAt: string;
+  candidates: SkillCandidate[];
   review: SkillReviewResult;
 }
 
@@ -60,9 +71,10 @@ export default function SkillsPage() {
   const [mounts, setMounts] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [stagingItems, setStagingItems] = useState<StagingItem[]>([]);
-  const [reviewingName, setReviewingName] = useState<string | null>(null);
-  const [publishingName, setPublishingName] = useState<string | null>(null);
+  const [stagingBatches, setStagingBatches] = useState<StagingBatch[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [selectedCandidates, setSelectedCandidates] = useState<Record<string, Set<string>>>({});
 
   const fetchSkills = useCallback(async () => {
     const res = await fetch("/api/skills");
@@ -79,7 +91,17 @@ export default function SkillsPage() {
   const fetchStaging = useCallback(async () => {
     const res = await fetch("/api/skills/staging");
     const data = await res.json();
-    if (data.success) setStagingItems(data.staging);
+    if (data.success) {
+      setStagingBatches(data.staging);
+      // 初始化勾选：已通过的批次，默认全选
+      const sel: Record<string, Set<string>> = {};
+      for (const b of data.staging) {
+        if (b.review.verdict === "pass") {
+          sel[b.batchId] = new Set(b.candidates.map((c: SkillCandidate) => c.name));
+        }
+      }
+      setSelectedCandidates(sel);
+    }
   }, []);
 
   useEffect(() => {
@@ -141,37 +163,57 @@ export default function SkillsPage() {
     }
   }
 
-  async function handlePublish(name: string) {
-    setPublishingName(name);
+  function toggleCandidate(batchId: string, candidateName: string) {
+    setSelectedCandidates((prev) => {
+      const next = { ...prev };
+      const current = new Set(prev[batchId] ?? []);
+      if (current.has(candidateName)) {
+        current.delete(candidateName);
+      } else {
+        current.add(candidateName);
+      }
+      next[batchId] = current;
+      return next;
+    });
+  }
+
+  async function handlePublish(batchId: string) {
+    const names = Array.from(selectedCandidates[batchId] ?? []);
+    if (names.length === 0) { alert("请至少选择一个 Skill"); return; }
+    setPublishingId(batchId);
     try {
-      const res = await fetch(`/api/skills/staging/${name}/publish`, { method: "POST" });
+      const res = await fetch(`/api/skills/staging/${batchId}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names }),
+      });
       const data = await res.json();
       if (!data.success) { alert(data.error); return; }
       await Promise.all([fetchSkills(), fetchStaging()]);
     } catch {
       alert("网络错误");
     } finally {
-      setPublishingName(null);
+      setPublishingId(null);
     }
   }
 
-  async function handleReReview(name: string) {
-    setReviewingName(name);
+  async function handleReReview(batchId: string) {
+    setReviewingId(batchId);
     try {
-      const res = await fetch(`/api/skills/staging/${name}/review`, { method: "POST" });
+      const res = await fetch(`/api/skills/staging/${batchId}/review`, { method: "POST" });
       const data = await res.json();
       if (!data.success) { alert(data.error); return; }
       await fetchStaging();
     } catch {
       alert("网络错误");
     } finally {
-      setReviewingName(null);
+      setReviewingId(null);
     }
   }
 
-  async function handleDiscard(name: string) {
-    if (!confirm(`确定放弃 "${name}"？此操作不可逆。`)) return;
-    await fetch(`/api/skills/${name}`, { method: "DELETE" });
+  async function handleDiscard(batchId: string) {
+    if (!confirm(`确定放弃批次 "${batchId}"？此操作不可逆。`)) return;
+    await fetch(`/api/skills/${batchId}`, { method: "DELETE" });
     await fetchStaging();
   }
 
@@ -212,14 +254,14 @@ export default function SkillsPage() {
       </div>
 
       {/* Staging 待审查区 */}
-      {stagingItems.length > 0 && (
+      {stagingBatches.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-muted-foreground">待审查</h3>
-          {stagingItems.map((item) => (
+          {stagingBatches.map((batch) => (
             <Card
-              key={item.name}
+              key={batch.batchId}
               className={
-                item.review.verdict === "reject" && item.review.status === "rejected"
+                batch.review.verdict === "reject" && batch.review.status === "rejected"
                   ? "border-destructive/30"
                   : "border-amber-500/30"
               }
@@ -228,37 +270,59 @@ export default function SkillsPage() {
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">v{item.version}</span>
-                      {item.review.status === "pending" && (
+                      <span className="font-semibold">{batch.batchId}</span>
+                      {batch.review.status === "pending" && (
                         <Badge variant="secondary">
                           <Loader2 className="h-3 w-3 animate-spin" /> 待审查
                         </Badge>
                       )}
-                      {item.review.status === "passed" && (
+                      {batch.review.status === "passed" && (
                         <Badge variant="default">
                           <CheckCircle className="h-3 w-3" /> 审查通过
                         </Badge>
                       )}
-                      {item.review.status === "rejected" && (
+                      {batch.review.status === "rejected" && (
                         <Badge variant="destructive">
                           <XCircle className="h-3 w-3" /> 审查未通过
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                     <div className="mt-1 text-xs text-muted-foreground">
                       来源:{" "}
-                      <code className="rounded bg-muted px-1 text-xs">{item.sourceUrl}</code>
+                      <code className="rounded bg-muted px-1 text-xs">{batch.sourceUrl}</code>
                     </div>
 
-                    {item.review.summary && (
-                      <p className="mt-2 text-sm">{item.review.summary}</p>
+                    {/* Candidates 列表 */}
+                    <div className="mt-2 space-y-1">
+                      <span className="text-xs font-medium">
+                        包含 {batch.candidates.length} 个 Skill：
+                      </span>
+                      {batch.candidates.map((c) => (
+                        <div key={c.name} className="flex items-center gap-2 text-sm">
+                          {batch.review.verdict === "pass" ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedCandidates[batch.batchId]?.has(c.name) ?? false}
+                              onChange={() => toggleCandidate(batch.batchId, c.name)}
+                              className="h-3.5 w-3.5 accent-primary"
+                            />
+                          ) : (
+                            <span className="w-3.5" />
+                          )}
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-xs text-muted-foreground">v{c.version}</span>
+                          <span className="text-xs text-muted-foreground">— {c.description}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {batch.review.summary && (
+                      <p className="mt-2 text-sm">{batch.review.summary}</p>
                     )}
 
-                    {item.review.verdict === "reject" && item.review.issues.length > 0 && (
+                    {batch.review.verdict === "reject" && batch.review.issues.length > 0 && (
                       <div className="mt-2 space-y-1">
-                        {item.review.issues.map((issue, i) => (
+                        {batch.review.issues.map((issue, i) => (
                           <div key={i} className="rounded-md bg-destructive/10 p-2 text-xs">
                             <span className="font-medium">
                               [{issue.dimension === "security" ? "安全" : issue.dimension === "execution_scope" ? "执行边界" : "协议"}]
@@ -272,39 +336,39 @@ export default function SkillsPage() {
                       </div>
                     )}
 
-                    {item.review.reviewedAt && (
+                    {batch.review.reviewedAt && (
                       <div className="mt-1 text-xs text-muted-foreground">
-                        审查时间: {new Date(item.review.reviewedAt).toLocaleString("zh-CN")}
+                        审查时间: {new Date(batch.review.reviewedAt).toLocaleString("zh-CN")}
                       </div>
                     )}
                   </div>
 
                   <div className="ml-4 flex shrink-0 items-center gap-1">
-                    {item.review.verdict === "pass" && (
+                    {batch.review.verdict === "pass" && (
                       <Button
                         size="sm"
-                        onClick={() => handlePublish(item.name)}
-                        disabled={publishingName === item.name}
+                        onClick={() => handlePublish(batch.batchId)}
+                        disabled={publishingId === batch.batchId}
                       >
-                        {publishingName === item.name ? "安装中..." : "安装"}
+                        {publishingId === batch.batchId ? "安装中..." : "安装选中"}
                       </Button>
                     )}
-                    {item.review.verdict === "reject" && item.review.status === "rejected" && (
+                    {batch.review.verdict === "reject" && batch.review.status === "rejected" && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleReReview(item.name)}
-                        disabled={reviewingName === item.name}
+                        onClick={() => handleReReview(batch.batchId)}
+                        disabled={reviewingId === batch.batchId}
                       >
                         <RefreshCw className="h-3.5 w-3.5" />
-                        {reviewingName === item.name ? "审查中..." : "重新审查"}
+                        {reviewingId === batch.batchId ? "审查中..." : "重新审查"}
                       </Button>
                     )}
                     <Button
                       variant="ghost"
                       size="icon-sm"
                       className="text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDiscard(item.name)}
+                      onClick={() => handleDiscard(batch.batchId)}
                       title="放弃"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

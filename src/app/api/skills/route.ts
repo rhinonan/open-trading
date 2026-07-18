@@ -23,19 +23,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. 下载到 staging
-    const installed = await skillService.installToStaging(url.trim());
+    const batch = await skillService.installToStaging(url.trim());
 
     // 2. 触发审查
     const run = await mastra.getWorkflow("skillReviewWorkflow").createRun();
-    const reviewResult = await run.start({ inputData: { name: installed.name } });
+    await run.start({ inputData: { batchId: batch.batchId } });
 
-    // 3. 返回结果（含审查状态）
-    const stagingInfo = skillService.getStaging(installed.name);
+    // 3. 返回批次信息
+    const stagingInfo = skillService.getStaging(batch.batchId);
     return Response.json({
       success: true,
-      name: installed.name,
-      version: installed.version,
-      review: stagingInfo?.review ?? null,
+      batch: stagingInfo,
     });
   } catch (err) {
     return Response.json(
