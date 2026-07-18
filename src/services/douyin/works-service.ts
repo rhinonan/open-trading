@@ -2,8 +2,8 @@
 import { db } from "@/db";
 import { works, bloggers, predictionItems } from "@/db/schema";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
-import { mastra } from "@/mastra";
 import { extractOpinion } from "@/services/douyin/opinion-service";
+import { startTranscribeWork } from "@/services/douyin/pipeline-service";
 import type {
   WorkWithBlogger,
   WorksFilter,
@@ -183,66 +183,6 @@ export async function queryWorks(
   };
 }
 
-export async function transcribeWork(workId: number): Promise<{ success: boolean; error?: string }> {
-  // 查 work 数据
-  const work = db
-    .select({
-      id: works.id,
-      awemeId: works.awemeId,
-      videoUrl: works.videoUrl,
-      duration: works.duration,
-      transcriptStatus: works.transcriptStatus,
-    })
-    .from(works)
-    .where(eq(works.id, workId))
-    .get();
-
-  if (!work) {
-    return { success: false, error: "作品不存在" };
-  }
-
-  if (work.transcriptStatus === "processing") {
-    return { success: false, error: "该作品正在转写中" };
-  }
-
-  if (!work.videoUrl) {
-    return { success: false, error: "该作品没有视频链接" };
-  }
-
-  try {
-    // 更新状态为 processing
-    db.update(works)
-      .set({ transcriptStatus: "processing" })
-      .where(eq(works.id, workId))
-      .run();
-
-    // 启动 Mastra workflow（后台运行，不等待完成以提高响应速度）
-    const run = await mastra
-      .getWorkflow("transcribeWorkWorkflow")
-      .createRun();
-    await run.start({
-      inputData: {
-        workId: work.id,
-        awemeId: work.awemeId,
-        videoUrl: work.videoUrl,
-        duration: work.duration,
-      },
-    });
-
-    return { success: true };
-  } catch (err) {
-    // 回写失败状态
-    db.update(works)
-      .set({ transcriptStatus: "failed" })
-      .where(eq(works.id, workId))
-      .run();
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "转写失败",
-    };
-  }
-}
-
 export async function summarizeWork(workId: number): Promise<{ success: boolean; error?: string; summary?: string }> {
   const work = db
     .select({
@@ -287,7 +227,7 @@ export async function batchOperate(
   for (const workId of workIds) {
     let result: { success: boolean; error?: string };
     if (action === "transcribe") {
-      result = await transcribeWork(workId);
+      result = startTranscribeWork(workId);
     } else {
       result = await summarizeWork(workId);
     }
