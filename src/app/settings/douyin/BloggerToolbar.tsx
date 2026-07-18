@@ -149,23 +149,20 @@ export function BloggerToolbar({
           提取观点
         </Button>
 
-        {/* 评判 — 置灰 */}
-        <Tooltip>
-          <TooltipTrigger render={<span className="inline-flex" />}>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="opacity-50 cursor-not-allowed"
-            >
-              <BarChart3 className="h-4 w-4 mr-1.5" />
-              评判
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            ASR 流水线就绪后启用
-          </TooltipContent>
-        </Tooltip>
+        {/* 评判 */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleClick("evaluate")}
+          disabled={processingAction !== null}
+        >
+          {isProcessing("evaluate") ? (
+            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+          ) : (
+            <BarChart3 className="h-4 w-4 mr-1.5" />
+          )}
+          评判
+        </Button>
 
         {/* 选中提示 */}
         {selectedCount > 0 && (

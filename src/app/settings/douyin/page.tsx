@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Radio } from "lucide-react";
 import {
   Card,
@@ -43,6 +43,15 @@ export default function DouyinSettingsPage() {
   // --- Processing state ---
   const [processingAction, setProcessingAction] = useState<ToolbarAction | null>(null);
   const [message, setMessage] = useState("");
+
+  // --- Eval progress state ---
+  const [evalProgress, setEvalProgress] = useState<Record<string, number>>({});
+  const [evalCron, setEvalCron] = useState("5 17 * * 1-5");
+  const [evalEnabled, setEvalEnabled] = useState(true);
+  const [nextRun, setNextRun] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [evalAllLoading, setEvalAllLoading] = useState(false);
+  const evalPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // --- Fetch bloggers ---
   const fetchBloggers = useCallback(async () => {
@@ -113,6 +122,88 @@ export default function DouyinSettingsPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [expandedId, worksCache]);
+
+  // --- Eval progress polling ---
+  useEffect(() => {
+    evalPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch("/api/douyin/evaluate/progress");
+        const data = await res.json();
+        if (data.success) setEvalProgress(data);
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => {
+      if (evalPollRef.current) clearInterval(evalPollRef.current);
+    };
+  }, []);
+
+  // --- Fetch eval cron config ---
+  useEffect(() => {
+    fetch("/api/settings/eval-schedule")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          setEvalCron(d.cron);
+          setEvalEnabled(d.enabled);
+          // Compute next run preview
+          try {
+            const { parseCron, describeCronNext } = require("@/lib/cron-matcher");
+            const fields = parseCron(d.cron);
+            setNextRun(describeCronNext(fields));
+          } catch { setNextRun(""); }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // --- Update next run preview when cron changes ---
+  useEffect(() => {
+    try {
+      // Dynamic import to avoid SSR issues (pure browser-side computation)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { parseCron, describeCronNext } = require("@/lib/cron-matcher");
+      const fields = parseCron(evalCron);
+      setNextRun(describeCronNext(fields));
+    } catch { setNextRun("cron 格式无效"); }
+  }, [evalCron]);
+
+  // --- Eval handlers ---
+  const handleSaveSchedule = async () => {
+    setSaving(true);
+    try {
+      await fetch("/api/settings/eval-schedule", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cron: evalCron, enabled: evalEnabled }),
+      });
+      setMessage("定时配置已保存");
+    } catch {
+      setMessage("保存失败");
+    }
+    setSaving(false);
+  };
+
+  const handleEvalAll = async () => {
+    setEvalAllLoading(true);
+    try {
+      const res = await fetch("/api/douyin/evaluate", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setMessage(`评判入队完成，共 ${data.enqueued} 个作品`);
+      } else {
+        setMessage(`入队失败: ${data.error}`);
+      }
+    } catch {
+      setMessage("请求失败");
+    }
+    setEvalAllLoading(false);
+  };
+
+  const CRON_PRESETS = [
+    { value: "5 17 * * 1-5", label: "工作日收盘后" },
+    { value: "5 17 * * *", label: "每日收盘后" },
+    { value: "0 9 * * 1", label: "每周一" },
+  ];
 
   // --- Selection ---
   const handleToggleSelect = (id: number) => {
@@ -318,6 +409,76 @@ export default function DouyinSettingsPage() {
             setWorksCache({});
           }}
         />
+
+        {/* 评判控制区 */}
+        <div className="rounded-lg border p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm">准确度评判</h3>
+            {evalAllLoading && (
+              <span className="text-xs text-muted-foreground animate-pulse">入队中...</span>
+            )}
+          </div>
+
+          {/* 进度条 */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">评判进度：</span>
+            <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">完成 {evalProgress.done ?? 0}</span>
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">队列 {evalProgress.pending ?? 0}</span>
+            <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">处理中 {evalProgress.processing ?? 0}</span>
+            <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">失败 {evalProgress.failed ?? 0}</span>
+            <span className="text-muted-foreground text-xs">共 {evalProgress.total ?? 0} 可评判作品</span>
+          </div>
+
+          {/* 按钮行 */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleEvalAll}
+              disabled={evalAllLoading}
+              className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              立即评判全部
+            </button>
+
+            {/* Cron 配置 */}
+            <div className="ml-0 sm:ml-4 flex flex-wrap items-center gap-2">
+              <label className="text-sm text-muted-foreground">定时：</label>
+              <input
+                type="text"
+                value={evalCron}
+                onChange={(e) => setEvalCron(e.target.value)}
+                className="border-input bg-background w-32 rounded-md border px-2 py-1 text-sm font-mono"
+                placeholder="5 17 * * 1-5"
+              />
+              <select
+                onChange={(e) => e.target.value && setEvalCron(e.target.value)}
+                className="border-input bg-background rounded-md border px-2 py-1 text-sm"
+                defaultValue=""
+              >
+                <option value="" disabled>快捷预设</option>
+                {CRON_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+              <label className="inline-flex items-center gap-1 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={evalEnabled}
+                  onChange={(e) => setEvalEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded accent-primary"
+                />
+                启用
+              </label>
+              <button
+                onClick={handleSaveSchedule}
+                disabled={saving}
+                className="hover:bg-muted rounded-md px-2 py-1 text-sm border transition-colors disabled:opacity-50"
+              >
+                {saving ? "保存中..." : "保存"}
+              </button>
+              <span className="text-muted-foreground text-xs">{nextRun ? `下次：${nextRun}` : ""}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Feedback message */}
         {message && (
