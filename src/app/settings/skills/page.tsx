@@ -33,6 +33,25 @@ interface SkillMeta {
   enabled: boolean;
 }
 
+interface ReviewIssue {
+  dimension: "security" | "execution_scope" | "license";
+  severity: "error" | "warning";
+  file: string | null;
+  description: string;
+}
+
+interface SkillReviewResult {
+  status: "pending" | "reviewing" | "passed" | "rejected";
+  reviewedAt: string | null;
+  verdict: "pass" | "reject";
+  summary: string;
+  issues: ReviewIssue[];
+}
+
+interface StagingItem extends SkillMeta {
+  review: SkillReviewResult;
+}
+
 export default function SkillsPage() {
   const [skills, setSkills] = useState<SkillMeta[]>([]);
   const [url, setUrl] = useState("");
@@ -41,6 +60,9 @@ export default function SkillsPage() {
   const [mounts, setMounts] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [stagingItems, setStagingItems] = useState<StagingItem[]>([]);
+  const [reviewingName, setReviewingName] = useState<string | null>(null);
+  const [publishingName, setPublishingName] = useState<string | null>(null);
 
   const fetchSkills = useCallback(async () => {
     const res = await fetch("/api/skills");
@@ -54,11 +76,17 @@ export default function SkillsPage() {
     if (data.success) setMounts(data.mounts);
   }, []);
 
+  const fetchStaging = useCallback(async () => {
+    const res = await fetch("/api/skills/staging");
+    const data = await res.json();
+    if (data.success) setStagingItems(data.staging);
+  }, []);
+
   useEffect(() => {
-    Promise.all([fetchSkills(), fetchMounts()]).finally(() =>
+    Promise.all([fetchSkills(), fetchMounts(), fetchStaging()]).finally(() =>
       setLoading(false)
     );
-  }, [fetchSkills, fetchMounts]);
+  }, [fetchSkills, fetchMounts, fetchStaging]);
 
   async function handleInstall() {
     if (!url.trim()) return;
@@ -76,7 +104,7 @@ export default function SkillsPage() {
         return;
       }
       setUrl("");
-      await fetchSkills();
+      await fetchStaging();
     } catch {
       setError("网络错误");
     } finally {
@@ -111,6 +139,40 @@ export default function SkillsPage() {
           : "已是最新"
       );
     }
+  }
+
+  async function handlePublish(name: string) {
+    setPublishingName(name);
+    try {
+      const res = await fetch(`/api/skills/staging/${name}/publish`, { method: "POST" });
+      const data = await res.json();
+      if (!data.success) { alert(data.error); return; }
+      await Promise.all([fetchSkills(), fetchStaging()]);
+    } catch {
+      alert("网络错误");
+    } finally {
+      setPublishingName(null);
+    }
+  }
+
+  async function handleReReview(name: string) {
+    setReviewingName(name);
+    try {
+      const res = await fetch(`/api/skills/staging/${name}/review`, { method: "POST" });
+      const data = await res.json();
+      if (!data.success) { alert(data.error); return; }
+      await fetchStaging();
+    } catch {
+      alert("网络错误");
+    } finally {
+      setReviewingName(null);
+    }
+  }
+
+  async function handleDiscard(name: string) {
+    if (!confirm(`确定放弃 "${name}"？此操作不可逆。`)) return;
+    await fetch(`/api/skills/${name}`, { method: "DELETE" });
+    await fetchStaging();
   }
 
   async function handleToggleMount(agentKey: string, skillName: string) {
@@ -148,6 +210,112 @@ export default function SkillsPage() {
           代码在服务器本机执行，可读取 Skill 文件但无宿主环境变量。
         </span>
       </div>
+
+      {/* Staging 待审查区 */}
+      {stagingItems.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">待审查</h3>
+          {stagingItems.map((item) => (
+            <Card
+              key={item.name}
+              className={
+                item.review.verdict === "reject" && item.review.status === "rejected"
+                  ? "border-destructive/30"
+                  : "border-amber-500/30"
+              }
+            >
+              <CardContent className="pt-4">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="text-xs text-muted-foreground">v{item.version}</span>
+                      {item.review.status === "pending" && (
+                        <Badge variant="secondary">
+                          <Loader2 className="h-3 w-3 animate-spin" /> 待审查
+                        </Badge>
+                      )}
+                      {item.review.status === "passed" && (
+                        <Badge variant="default">
+                          <CheckCircle className="h-3 w-3" /> 审查通过
+                        </Badge>
+                      )}
+                      {item.review.status === "rejected" && (
+                        <Badge variant="destructive">
+                          <XCircle className="h-3 w-3" /> 审查未通过
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      来源:{" "}
+                      <code className="rounded bg-muted px-1 text-xs">{item.sourceUrl}</code>
+                    </div>
+
+                    {item.review.summary && (
+                      <p className="mt-2 text-sm">{item.review.summary}</p>
+                    )}
+
+                    {item.review.verdict === "reject" && item.review.issues.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {item.review.issues.map((issue, i) => (
+                          <div key={i} className="rounded-md bg-destructive/10 p-2 text-xs">
+                            <span className="font-medium">
+                              [{issue.dimension === "security" ? "安全" : issue.dimension === "execution_scope" ? "执行边界" : "协议"}]
+                            </span>
+                            {issue.file && (
+                              <span className="ml-1 font-mono text-muted-foreground">{issue.file}</span>
+                            )}
+                            <span className="ml-1">{issue.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {item.review.reviewedAt && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        审查时间: {new Date(item.review.reviewedAt).toLocaleString("zh-CN")}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="ml-4 flex shrink-0 items-center gap-1">
+                    {item.review.verdict === "pass" && (
+                      <Button
+                        size="sm"
+                        onClick={() => handlePublish(item.name)}
+                        disabled={publishingName === item.name}
+                      >
+                        {publishingName === item.name ? "安装中..." : "安装"}
+                      </Button>
+                    )}
+                    {item.review.verdict === "reject" && item.review.status === "rejected" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReReview(item.name)}
+                        disabled={reviewingName === item.name}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        {reviewingName === item.name ? "审查中..." : "重新审查"}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDiscard(item.name)}
+                      title="放弃"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* 安装区 */}
       <Card>
