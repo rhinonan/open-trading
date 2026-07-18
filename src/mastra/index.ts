@@ -2,6 +2,7 @@
 import { Mastra } from "@mastra/core";
 import { LibSQLStore } from "@mastra/libsql";
 import { Observability, MastraStorageExporter } from "@mastra/observability";
+import { imageOpinionAgent } from "@/mastra/agents/image-opinion-agent";
 import { opinionAgent } from "@/mastra/agents/opinion-agent";
 import { evaluatorAgent } from "@/mastra/agents/evaluator-agent";
 import { skillReviewerAgent } from "@/mastra/agents/skill-reviewer-agent";
@@ -16,7 +17,7 @@ const storageUrl =
   "file:" + dataPath("mastra.db").replace(/\\/g, "/");
 
 export const mastra = new Mastra({
-  agents: { opinionAgent, evaluatorAgent, skillReviewerAgent },
+  agents: { opinionAgent, imageOpinionAgent, evaluatorAgent, skillReviewerAgent },
   workflows: { transcribeWorkWorkflow, evaluateWorkWorkflow, skillReviewWorkflow },
   storage: new LibSQLStore({
     id: "mastra-storage",
