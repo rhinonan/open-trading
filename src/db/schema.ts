@@ -48,6 +48,10 @@ export const works = sqliteTable(
     evalStatus: text("eval_status", {
       enum: ["none", "pending", "processing", "done", "failed"],
     }).notNull().default("none"),
+    // 媒体类型：2=图集, 4=视频
+    mediaType: integer("media_type").notNull().default(4),
+    // 图集图片 URL 列表（JSON 数组字符串）
+    imageUrls: text("image_urls").notNull().default("[]"),
     evalClaimedAt: integer("eval_claimed_at"),
     evaluatedAt: integer("evaluated_at"),
   },

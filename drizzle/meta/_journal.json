@@ -57,6 +57,13 @@
       "when": 1787040000000,
       "tag": "0007_eval_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784389261212,
+      "tag": "0008_broad_vulcan",
+      "breakpoints": true
     }
   ]
 }
