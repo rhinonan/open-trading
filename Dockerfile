@@ -27,8 +27,13 @@ RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev && npm cache clean --force
 
-# Clean up build tools to keep the image small
-RUN apt-get purge -y python3 make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+# Retain python3 for Mastra skill sandbox execution
+RUN apt-get update && apt-get install -y python3-pip && \
+    pip3 install --no-cache-dir --break-system-packages mootdx requests pandas stockstats && \
+    rm -rf /var/lib/apt/lists/*
+
+# Clean up build tools (NOT python3 — skill sandbox needs it)
+RUN apt-get purge -y make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Copy build output and static assets
 COPY --from=builder /app/.next ./.next

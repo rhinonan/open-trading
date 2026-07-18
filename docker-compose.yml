@@ -8,4 +8,6 @@ services:
       - ./data:/app/data
     env_file:
       - .env
+    mem_limit: 2g
+    cpus: 2
     restart: unless-stopped
