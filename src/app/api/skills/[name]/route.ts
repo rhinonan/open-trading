@@ -44,6 +44,14 @@ export async function DELETE(
 ) {
   try {
     const { name } = await ctx.params;
+    // 检查 staging 中是否存在同名项目
+    const stagingItems = skillService.listStaging();
+    const inStaging = stagingItems.find(s => s.name === name);
+    if (inStaging) {
+      skillService.discardStaging(name);
+      return Response.json({ success: true });
+    }
+    // 否则删除正式 skill
     skillService.deleteSkill(name);
     return Response.json({ success: true });
   } catch (err) {
