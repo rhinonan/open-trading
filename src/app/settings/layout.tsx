@@ -19,13 +19,6 @@ export default function SettingsLayout({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">设置</h1>
-        <p className="text-muted-foreground mt-1">
-          管理主题偏好、LLM 模型与抖音雷达配置
-        </p>
-      </div>
-
       {/* 页签导航 */}
       <div className="flex gap-1 border-b">
         {TABS.map((tab) => (

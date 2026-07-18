@@ -14,15 +14,7 @@ export default function AgentsPage() {
   const selectedAgent = agents.find((a) => a.key === selectedKey) ?? null;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Agent 管理</h1>
-        <p className="text-muted-foreground mt-1">
-          选择一个 Agent，在右侧对话区进行测试
-        </p>
-      </div>
-
-      <div className="flex gap-4 h-[calc(100vh-12rem)]">
+    <div className="flex gap-4 h-[calc(100vh-12rem)]">
         {/* 左侧面板 */}
         <div className="w-80 shrink-0 flex flex-col gap-4 overflow-y-auto">
           <div className="rounded-lg border bg-card p-4 space-y-3">
@@ -68,6 +60,5 @@ export default function AgentsPage() {
           )}
         </div>
       </div>
-    </div>
   );
 }

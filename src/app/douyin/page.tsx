@@ -65,13 +65,6 @@ export default function DouyinPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">抖音雷达</h1>
-        <p className="text-muted-foreground mt-1">
-          追踪抖音财经博主观点与预测
-        </p>
-      </div>
-
       {/* 排序栏 */}
       <div className="flex gap-2 border-b pb-2">
         {SORT_OPTIONS.map((opt) => (
