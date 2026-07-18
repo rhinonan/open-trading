@@ -53,23 +53,36 @@ export async function GET(
         .get(traceId) as {
         workflow_name: string;
         run_id: string;
-        snapshot: string | null;
+        snapshot: Buffer | null;
         createdAt: string;
         updatedAt: string;
       } | undefined;
 
       if (row) {
-        let parsed: Record<string, unknown> | null = null;
-        try {
-          parsed = JSON.parse(row.snapshot ?? "{}");
-        } catch {
-          parsed = null;
+        // snapshot 是 MessagePack 二进制，提取其中可读文本
+        const rawStr = row.snapshot ? row.snapshot.toString("utf8") : "";
+        // 提取 transcript 字段
+        const tIdx = rawStr.indexOf("transcript");
+        let input = "";
+        if (tIdx >= 0) {
+          // 跳过 "transcript" 标记和 MessagePack 头部字节，直到遇到 CJK 字符
+          let pos = tIdx + 10; // "transcript" 本身 10 字节
+          for (let i = pos; i < Math.min(pos + 10, rawStr.length); i++) {
+            const code = rawStr.charCodeAt(i);
+            if (code >= 0x4e00 && code <= 0x9fff) { pos = i; break; }
+            if (code >= 0x3000) { pos = i; break; }
+          }
+          // 从 CJK 字符开始提取直到遇到不可读字符
+          let end = pos;
+          for (let i = pos; i < Math.min(pos + 5000, rawStr.length); i++) {
+            const code = rawStr.charCodeAt(i);
+            if (code < 0x20 && code !== 0x0a) break;
+            end = i + 1;
+          }
+          input = rawStr.slice(pos, end).trim();
         }
-
-        const context = (parsed?.context ?? parsed?.value ?? {}) as Record<string, unknown>;
-        const input = context?.input ?? parsed?.input ?? null;
-        const output = context?.output ?? parsed?.output ?? null;
-        const status = (parsed?.status as string) ?? "unknown";
+        if (!input) input = "（无法解析输入）";
+        const status = rawStr.includes("success") ? "success" : rawStr.includes("failed") ? "failed" : "unknown";
         const error = status === "failed" ? "Workflow execution failed" : null;
 
         return Response.json({
@@ -86,7 +99,7 @@ export async function GET(
               endedAt: row.updatedAt !== row.createdAt ? row.updatedAt : null,
               error,
               input,
-              output,
+              output: null,
               attributes: { status, workflowName: row.workflow_name },
             },
           ],

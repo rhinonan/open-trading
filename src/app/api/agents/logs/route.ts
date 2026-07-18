@@ -35,39 +35,63 @@ function inferCallSource(
   return "test";
 }
 
-/** 从 workflow snapshot JSON 中提取输入摘要 */
-function extractWorkflowInput(snapshot: string | null): string {
-  if (!snapshot) return "";
+/**
+ * 从 MessagePack 二进制 Buffer 中提取可读文本。
+ * 策略：找到 "transcript" 字段标记，提取紧随其后的长 CJK 文本段。
+ * 回退：取整个 buffer 去噪后的最长连续可读段。
+ */
+function extractMsgpackText(buf: Buffer, fieldMarker: string): string {
   try {
-    const parsed = JSON.parse(snapshot);
-    const ctx = parsed?.context ?? {};
-    const input = ctx?.input ?? parsed?.input;
-    if (input == null) return "";
-    return truncatePreview(input, 100);
+    const str = buf.toString("utf8");
+    // 在 "transcript" 或 "opinionSummary" 后寻找长 CJK 文本
+    // MessagePack 字符串格式：类型标记(1B) + 长度(N bytes) + UTF-8 数据
+    // 长文本(>31B)的类型标记范围是 0xd9-0xdb，长度字节位于标记和文本之间
+    const idx = str.indexOf(fieldMarker);
+    if (idx >= 0) {
+      // 跳到 fieldMarker 之后，跳过 MessagePack 头部
+      let pos = idx + fieldMarker.length;
+      // 跳过类型标记和长度字节（最多 5 字节的 msgpack 头部）
+      for (let i = 0; i < 5 && pos < str.length; i++) {
+        const code = str.charCodeAt(pos);
+        if (code >= 0x20 && code <= 0x7e) break; // 可打印 ASCII，可能是下个字段名
+        if (code >= 0x4e00 && code <= 0x9fff) break; // CJK 开始
+        if (code >= 0x3000) break; // 全角标点等
+        pos++;
+      }
+      // 从 pos 开始提取可读文本
+      let text = "";
+      for (let i = pos; i < Math.min(pos + 500, str.length); i++) {
+        const code = str.charCodeAt(i);
+        if (code >= 0x20 || code >= 0x3000) {
+          text += str[i];
+        } else if (text.length > 10) {
+          break; // 遇到足够长的文本后遇到控制字符，停止
+        } else {
+          text = ""; // 还不够长，重置
+        }
+      }
+      if (text.trim().length > 10) return text.trim();
+    }
+    // 回退：清理非可读字符，取最长连续段
+    const cleaned = str.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").replace(/\s+/g, " ").trim();
+    return cleaned;
   } catch {
-    return truncatePreview(snapshot, 100);
+    return "";
   }
 }
 
-/** 判断 workflow snapshot 是否有错误 */
-function extractWorkflowError(snapshot: string | null): string | null {
+function extractWorkflowInput(snapshot: Buffer | string | null): string {
+  if (!snapshot) return "";
+  const buf = Buffer.isBuffer(snapshot) ? snapshot : Buffer.from(snapshot, "utf8");
+  const text = extractMsgpackText(buf, "transcript") || extractMsgpackText(buf, "opinionSummary");
+  return truncatePreview(text || "", 100);
+}
+
+function extractWorkflowError(snapshot: Buffer | string | null): string | null {
   if (!snapshot) return null;
-  try {
-    const parsed = JSON.parse(snapshot);
-    if (parsed?.status === "failed") {
-      // 尝试从 context 中提取错误
-      const steps = parsed?.context ?? {};
-      for (const [_key, step] of Object.entries(steps) as [string, { status?: string; error?: string }][]) {
-        if (step?.status === "failed" || step?.error) {
-          return step?.error ?? "Step failed";
-        }
-      }
-      return "Workflow failed";
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  const str = Buffer.isBuffer(snapshot) ? snapshot.toString("utf8") : snapshot;
+  if (str.includes("failed")) return "Workflow execution failed";
+  return null;
 }
 
 export async function GET(request: NextRequest) {
@@ -141,7 +165,7 @@ export async function GET(request: NextRequest) {
         .all() as Array<{
         workflow_name: string;
         run_id: string;
-        snapshot: string | null;
+        snapshot: Buffer | null;
         createdAt: string;
         updatedAt: string;
       }>;
