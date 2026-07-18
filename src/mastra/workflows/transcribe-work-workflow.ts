@@ -15,6 +15,7 @@ const workflowInputSchema = z.object({
   awemeId: z.string(),
   videoUrl: z.string(),
   duration: z.number(),
+  desc: z.string(),
 });
 
 type WorkflowInput = z.infer<typeof workflowInputSchema>;
@@ -77,10 +78,10 @@ const opinionAndSaveStep = createStep({
   }),
   retries: 2,
   execute: async ({ inputData, getInitData }) => {
-    const { workId, awemeId } = getInitData<WorkflowInput>();
+    const { workId, awemeId, desc } = getInitData<WorkflowInput>();
     console.log(`[${awemeId}] 开始提取观点摘要...`);
     // extractOpinion 内部已捕获所有异常并返回 ""（非致命）
-    const opinionSummary = await extractOpinion(inputData.transcript);
+    const opinionSummary = await extractOpinion(inputData.transcript, desc);
     console.log(`[${awemeId}] 观点摘要 → ${opinionSummary.slice(0, 50)}...`);
 
     db.update(works)

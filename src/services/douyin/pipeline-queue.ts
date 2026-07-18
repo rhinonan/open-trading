@@ -14,6 +14,7 @@ export interface ClaimedWork {
   awemeId: string;
   videoUrl: string | null;
   duration: number;
+  desc: string;
 }
 
 function nowEpoch(): number {
@@ -33,6 +34,7 @@ export function claimNextPending(
         awemeId: works.awemeId,
         videoUrl: works.videoUrl,
         duration: works.duration,
+        desc: works.desc,
       })
       .from(works)
       .where(eq(works.transcriptStatus, "pending"))

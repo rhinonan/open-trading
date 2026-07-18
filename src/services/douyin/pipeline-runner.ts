@@ -74,13 +74,13 @@ export function createRunner(opts: RunnerOptions): Runner {
 
 /** 真实任务执行：跑 Mastra 转写 workflow；自身消化所有错误（失败回写 DB），不抛出 */
 async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
-  const { id, awemeId, videoUrl, duration } = work;
+  const { id, awemeId, videoUrl, duration, desc } = work;
   const logPrefix = `[${awemeId}]`;
   try {
     if (!videoUrl) throw new Error("No video_url stored for this work");
     const run = await mastra.getWorkflow("transcribeWorkWorkflow").createRun();
     const result = await run.start({
-      inputData: { workId: id, awemeId, videoUrl, duration },
+      inputData: { workId: id, awemeId, videoUrl, duration, desc },
     });
     if (result.status !== "success") {
       const errorMsg =
