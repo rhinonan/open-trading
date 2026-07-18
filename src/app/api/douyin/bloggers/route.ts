@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import * as bloggerService from "@/services/douyin/blogger-service";
 import { db } from "@/db";
-import { works, evaluations, predictionItems } from "@/db/schema";
+import { works, predictionItems } from "@/db/schema";
 import { eq, desc, and, ne } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -30,18 +30,16 @@ export async function GET(request: NextRequest) {
           .limit(1)
           .get();
 
-        // Accuracy
+        // Accuracy (new schema: prediction_items → works via workId)
         const judgmentRows = db
           .select({ judgment: predictionItems.judgment })
           .from(predictionItems)
-          .innerJoin(
-            evaluations,
-            eq(predictionItems.evaluationId, evaluations.id)
-          )
+          .innerJoin(works, eq(predictionItems.workId, works.id))
           .where(
             and(
-              eq(evaluations.bloggerId, blogger.id),
-              ne(predictionItems.judgment, "not_applicable")
+              eq(works.bloggerId, blogger.id),
+              ne(predictionItems.judgment, "not_applicable"),
+              ne(predictionItems.judgment, "not_yet")
             )
           )
           .all() as Array<{ judgment: string }>;
@@ -49,10 +47,14 @@ export async function GET(request: NextRequest) {
         let accuracy: number | null = null;
         if (judgmentRows.length > 0) {
           const correct = judgmentRows.filter(
-            (r) =>
-              r.judgment === "correct" || r.judgment === "mostly_correct"
+            (r) => r.judgment === "correct"
           ).length;
-          accuracy = Math.round((correct / judgmentRows.length) * 100);
+          const mostlyCorrect = judgmentRows.filter(
+            (r) => r.judgment === "mostly_correct"
+          ).length;
+          accuracy = Math.round(
+            ((correct + 0.5 * mostlyCorrect) / judgmentRows.length) * 100
+          );
         }
 
         return {

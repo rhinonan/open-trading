@@ -1,6 +1,7 @@
+// src/app/api/douyin/bloggers/[slug]/evaluate/route.ts
+// Task 6 接入 eval-queue + eval-runner 后实物化；当前为占位
 import { NextRequest } from "next/server";
 import * as bloggerService from "@/services/douyin/blogger-service";
-import { evaluateBlogger } from "@/services/douyin/evaluator-service";
 
 export async function POST(
   _req: NextRequest,
@@ -12,8 +13,7 @@ export async function POST(
     if (!blogger) {
       return Response.json({ success: false, error: "博主不存在" }, { status: 404 });
     }
-    const result = await evaluateBlogger(blogger.id);
-    return Response.json({ success: true, ...result });
+    return Response.json({ success: true, enqueued: 0, message: "待 eval-queue 接入（Task 6）" });
   } catch (err) {
     return Response.json(
       { success: false, error: err instanceof Error ? err.message : "评判失败" },

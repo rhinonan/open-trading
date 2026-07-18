@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, X, Play, ImageIcon } from "lucide-react";
 import type {
   DouyinBlogger,
-  DouyinEvaluation,
   DouyinWork,
   PredictionItem,
   JudgmentResult,
@@ -26,6 +25,7 @@ const JUDGMENT_CONFIG: Record<
   },
   incorrect: { label: "不正确", color: "text-red-500", icon: "❌" },
   not_applicable: { label: "不涉及", color: "text-gray-400", icon: "—" },
+  not_yet: { label: "待验证", color: "text-amber-500", icon: "⏳" },
 };
 
 export default function BloggerDetailPage({
@@ -35,9 +35,7 @@ export default function BloggerDetailPage({
 }) {
   const { slug } = use(params);
   const [blogger, setBlogger] = useState<DouyinBlogger | null>(null);
-  const [records, setRecords] = useState<
-    Array<DouyinEvaluation & { items: PredictionItem[] }>
-  >([]);
+  const [records, setRecords] = useState<PredictionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"works" | "summary">("works");
   const [works, setWorks] = useState<DouyinWork[]>([]);
@@ -100,15 +98,13 @@ export default function BloggerDetailPage({
     );
   }
 
-  // Compute accuracy stats from records
-  const allItems = records.flatMap((r) => r.items);
+  // Compute accuracy stats from prediction items (new schema)
   const judgmentCounts = {
-    correct: allItems.filter((i) => i.judgment === "correct").length,
-    mostly_correct: allItems.filter((i) => i.judgment === "mostly_correct")
-      .length,
-    incorrect: allItems.filter((i) => i.judgment === "incorrect").length,
-    not_applicable: allItems.filter((i) => i.judgment === "not_applicable")
-      .length,
+    correct: records.filter((i) => i.judgment === "correct").length,
+    mostly_correct: records.filter((i) => i.judgment === "mostly_correct").length,
+    incorrect: records.filter((i) => i.judgment === "incorrect").length,
+    not_applicable: records.filter((i) => i.judgment === "not_applicable").length,
+    not_yet: records.filter((i) => i.judgment === "not_yet").length,
   };
   const totalJudged =
     judgmentCounts.correct +
@@ -117,7 +113,7 @@ export default function BloggerDetailPage({
   const accuracy =
     totalJudged > 0
       ? Math.round(
-          ((judgmentCounts.correct + judgmentCounts.mostly_correct) /
+          ((judgmentCounts.correct + 0.5 * judgmentCounts.mostly_correct) /
             totalJudged) *
             100
         )
@@ -220,8 +216,8 @@ export default function BloggerDetailPage({
                 } catch {}
 
                 // Find judgment for this work
-                const workJudgment = allItems.find(
-                  (item) => item.workId === work.id
+                const workJudgment = records.find(
+                  (item: PredictionItem) => item.workId === work.id
                 );
                 const jConfig = workJudgment
                   ? JUDGMENT_CONFIG[workJudgment.judgment]
@@ -306,147 +302,14 @@ export default function BloggerDetailPage({
 
       {/* Summary Tab */}
       {tab === "summary" && (
-        <div className="space-y-6">
-          {/* Stats overview */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card>
-              <CardContent className="pt-4 text-center">
-                <p className="text-2xl font-bold text-green-500">
-                  {judgmentCounts.correct}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">✅ 正确</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 text-center">
-                <p className="text-2xl font-bold text-emerald-500">
-                  {judgmentCounts.mostly_correct}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">💚 基本正确</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 text-center">
-                <p className="text-2xl font-bold text-red-500">
-                  {judgmentCounts.incorrect}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">❌ 不正确</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 text-center">
-                <p className="text-2xl font-bold text-gray-400">
-                  {judgmentCounts.not_applicable}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">— 不涉及</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Overall accuracy */}
-          <Card>
-            <CardContent className="pt-4 text-center">
-              <p className="text-sm text-muted-foreground">综合准确率</p>
-              <p className="text-3xl font-bold mt-1">
-                {accuracy !== null ? `${accuracy}%` : "--"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                基于 {totalJudged} 条有效评判
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Timeline records */}
-          {records.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="text-center py-12">
-                <p className="text-muted-foreground">暂无评判记录</p>
-                <p className="text-sm text-muted-foreground/60 mt-1">
-                  每日收盘后触发"收盘评判"即可生成记录
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            records.map((evaluation) => {
-              const evJudgmentCounts = {
-                correct: evaluation.items.filter(
-                  (i) => i.judgment === "correct"
-                ).length,
-                mostly_correct: evaluation.items.filter(
-                  (i) => i.judgment === "mostly_correct"
-                ).length,
-                incorrect: evaluation.items.filter(
-                  (i) => i.judgment === "incorrect"
-                ).length,
-                not_applicable: evaluation.items.filter(
-                  (i) => i.judgment === "not_applicable"
-                ).length,
-              };
-              const evTotal =
-                evJudgmentCounts.correct +
-                evJudgmentCounts.mostly_correct +
-                evJudgmentCounts.incorrect;
-              const evAccuracy =
-                evTotal > 0
-                  ? Math.round(
-                      ((evJudgmentCounts.correct +
-                        evJudgmentCounts.mostly_correct) /
-                        evTotal) *
-                        100
-                    )
-                  : null;
-
-              return (
-                <Card key={evaluation.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">
-                        {evaluation.evalDate}
-                      </CardTitle>
-                      {evAccuracy !== null && (
-                        <Badge variant="secondary">准确率 {evAccuracy}%</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {evaluation.predictionSummary}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    {evaluation.items.length > 0 && (
-                      <div className="space-y-3">
-                        {evaluation.items.map((item) => {
-                          const jConfig = JUDGMENT_CONFIG[item.judgment] ?? JUDGMENT_CONFIG.not_applicable;
-                          return (
-                            <div
-                              key={item.id}
-                              className="flex items-start gap-3 rounded-md border p-3 text-sm"
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium truncate">
-                                    {item.predictionTarget}
-                                  </span>
-                                </div>
-                                <p className="text-muted-foreground line-clamp-2">
-                                  &ldquo;{item.predictedContent}&rdquo;
-                                </p>
-                                <p className="mt-1 text-xs">
-                                  <span className={jConfig.color}>
-                                    {jConfig.icon} {jConfig.label}
-                                  </span>
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
+        <Card className="border-dashed">
+          <CardContent className="text-center py-12">
+            <p className="text-muted-foreground">评判记录功能将在 Task 8 重构</p>
+            <p className="text-sm text-muted-foreground/60 mt-1">
+              请暂时查看作品列表中的评判状态
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Image preview lightbox */}

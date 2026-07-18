@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import type { WorkWithBlogger } from "@/types";
+import type { WorkWithBlogger, JudgmentResult } from "@/types";
 
 const TRANSCRIPT_STATUS_CONFIG: Record<
   string,
@@ -65,7 +65,9 @@ export function WorkRow({
     variant: "secondary" as const,
   };
   const hasOpinion = work.opinionSummary && work.opinionSummary.length > 0;
-  const jConfig = work.judgment ? JUDGMENT_CONFIG[work.judgment.judgment] : null;
+  const jConfig = work.judgment?.latestItem
+    ? JUDGMENT_CONFIG[work.judgment.latestItem.judgment as JudgmentResult]
+    : null;
   const canTranscribe =
     work.transcriptStatus === "pending" || work.transcriptStatus === "failed";
   const canSummarize =

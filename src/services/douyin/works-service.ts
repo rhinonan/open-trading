@@ -10,6 +10,7 @@ import type {
   WorksResponse,
   TranscriptStatus,
   JudgmentResult,
+  WorkJudgment,
 } from "@/types";
 
 const DEFAULT_PER_PAGE = 20;
@@ -93,9 +94,9 @@ export async function queryWorks(
       bloggerAvatarUrl: bloggers.avatarUrl,
       bloggerFollowerCount: bloggers.followerCount,
       // judgment fields (may be null for unjudged works)
+      evalStatus: works.evalStatus,
       judgmentResult: predictionItems.judgment,
       judgmentContent: predictionItems.predictedContent,
-      evalId: predictionItems.evaluationId,
     })
     .from(works)
     .innerJoin(bloggers, eq(works.bloggerId, bloggers.id))
@@ -137,11 +138,19 @@ export async function queryWorks(
     judgment:
       row.judgmentResult
         ? {
-            judgment: row.judgmentResult,
-            predictedContent: row.judgmentContent ?? "",
+            evalStatus: (row.evalStatus ?? "none") as WorkJudgment["evalStatus"],
+            evaluable: 0,
+            correct: 0,
+            mostlyCorrect: 0,
+            incorrect: 0,
+            notYet: 0,
+            notApplicable: 0,
+            latestItem: {
+              judgment: row.judgmentResult,
+              predictedContent: row.judgmentContent ?? "",
+            },
           }
         : null,
-    evaluationId: row.evalId ?? null,
   }));
 
   // 计算 filter counts

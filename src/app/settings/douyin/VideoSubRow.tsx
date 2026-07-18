@@ -39,6 +39,7 @@ const JUDGMENT_CONFIG: Record<
   mostly_correct: { label: "基本正确", Icon: CheckCheck, colorClass: "text-emerald-600" },
   incorrect: { label: "不正确", Icon: X, colorClass: "text-red-600" },
   not_applicable: { label: "不涉及", Icon: Minus, colorClass: "text-gray-400" },
+  not_yet: { label: "待验证", Icon: Clock, colorClass: "text-amber-500" },
 };
 
 function formatRelativeTime(timestamp: number): string {
@@ -72,7 +73,9 @@ export function VideoSubRow({
     colorClass: "text-muted-foreground",
   };
   const hasOpinion = work.opinionSummary && work.opinionSummary.length > 0;
-  const jConfig = work.judgment ? JUDGMENT_CONFIG[work.judgment.judgment] : null;
+  const jConfig = work.judgment?.latestItem
+    ? JUDGMENT_CONFIG[work.judgment.latestItem.judgment as JudgmentResult]
+    : null;
   const canTranscribe = work.transcriptStatus === "pending" || work.transcriptStatus === "failed";
   const canSummarize = work.transcriptStatus === "done" && !hasOpinion;
   const isProcessing = work.transcriptStatus === "processing";
@@ -237,7 +240,7 @@ export function VideoSubRow({
               {work.judgment && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground">预测内容：</span>
-                  <p className="mt-0.5 text-muted-foreground">{work.judgment.predictedContent}</p>
+                  <p className="mt-0.5 text-muted-foreground">{work.judgment.latestItem?.predictedContent ?? ""}</p>
                 </div>
               )}
             </div>

@@ -117,7 +117,8 @@ export type JudgmentResult =
   | "correct"
   | "mostly_correct"
   | "incorrect"
-  | "not_applicable";
+  | "not_applicable"
+  | "not_yet";
 
 export type SortDimension = "followers" | "recent" | "accuracy";
 
@@ -158,27 +159,28 @@ export interface DouyinWork {
   scannedAt: number;
 }
 
-export interface DouyinEvaluation {
-  id: number;
-  bloggerId: number;
-  evalDate: string;
-  worksCount: number;
-  predictionSummary: string;
-  accuracyScore: number;
-  evalDetail: string;
-  marketSnapshot: string;
-  createdAt: number;
+export interface WorkJudgment {
+  evalStatus: "none" | "pending" | "processing" | "done" | "failed";
+  evaluable: number;
+  correct: number;
+  mostlyCorrect: number;
+  incorrect: number;
+  notYet: number;
+  notApplicable: number;
+  latestItem: { judgment: string; predictedContent: string } | null;
 }
 
 export interface PredictionItem {
   id: number;
-  evaluationId: number;
   workId: number;
   predictedContent: string;
   predictionTarget: string;
-  predictionDetail: string;
-  judgment: JudgmentResult;
   relatedSymbols: string;
+  judgment: JudgmentResult;
+  verifiableAfter: string | null;
+  reasoning: string;
+  evidence: string;
+  judgedAt: number;
 }
 
 export interface MarketSnapshot {
@@ -212,11 +214,7 @@ export interface WorkWithBlogger {
     avatarUrl: string;
     followerCount: number;
   };
-  judgment: {
-    judgment: JudgmentResult;
-    predictedContent: string;
-  } | null;
-  evaluationId: number | null;
+  judgment: WorkJudgment | null;
 }
 
 export interface WorksFilter {
