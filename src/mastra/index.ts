@@ -1,6 +1,7 @@
 // src/mastra/index.ts
 import { Mastra } from "@mastra/core";
 import { LibSQLStore } from "@mastra/libsql";
+import { Observability, MastraStorageExporter } from "@mastra/observability";
 import { opinionAgent } from "@/mastra/agents/opinion-agent";
 import { evaluatorAgent } from "@/mastra/agents/evaluator-agent";
 import { skillReviewerAgent } from "@/mastra/agents/skill-reviewer-agent";
@@ -20,5 +21,13 @@ export const mastra = new Mastra({
   storage: new LibSQLStore({
     id: "mastra-storage",
     url: storageUrl,
+  }),
+  observability: new Observability({
+    configs: {
+      default: {
+        serviceName: "open-trading",
+        exporters: [new MastraStorageExporter()],
+      },
+    },
   }),
 });
