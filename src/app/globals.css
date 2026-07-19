@@ -40,6 +40,19 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* 系统语义色 */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  /* A 股市场涨跌（红涨绿跌） */
+  --color-market-up: var(--market-up);
+  --color-market-down: var(--market-down);
+  --color-market-flat: var(--market-flat);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,81 +62,131 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+  Intelligence Console tokens
+  - 冷蓝钢 primary（唯一品牌强调色）
+  - 表面分层：canvas < sidebar < elevated(card)
+  - 市场色与系统色分离（A 股红涨绿跌）
+*/
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.546 0.245 262.881);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.546 0.245 262.881);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* 表面：浅冷灰 canvas，近白 card */
+  --background: oklch(0.97 0.005 250);
+  --foreground: oklch(0.18 0.015 250);
+  --card: oklch(0.995 0.002 250);
+  --card-foreground: oklch(0.18 0.015 250);
+  --popover: oklch(0.995 0.002 250);
+  --popover-foreground: oklch(0.18 0.015 250);
+
+  /* 品牌：冷蓝钢 */
+  --primary: oklch(0.45 0.12 245);
+  --primary-foreground: oklch(0.985 0.005 250);
+  --secondary: oklch(0.945 0.008 250);
+  --secondary-foreground: oklch(0.25 0.02 250);
+  --muted: oklch(0.945 0.008 250);
+  --muted-foreground: oklch(0.48 0.02 250);
+  --accent: oklch(0.945 0.01 250);
+  --accent-foreground: oklch(0.25 0.02 250);
+  --destructive: oklch(0.55 0.2 25);
+  --border: oklch(0.88 0.01 250);
+  --input: oklch(0.88 0.01 250);
+  --ring: oklch(0.45 0.12 245);
+
+  /* 系统语义（与涨跌区分：success 偏青、danger 偏玫） */
+  --success: oklch(0.52 0.12 175);
+  --success-foreground: oklch(0.98 0.01 175);
+  --warning: oklch(0.65 0.14 75);
+  --warning-foreground: oklch(0.25 0.04 75);
+  --danger: oklch(0.55 0.18 25);
+  --danger-foreground: oklch(0.98 0.01 25);
+  --info: oklch(0.5 0.1 245);
+  --info-foreground: oklch(0.98 0.01 245);
+
+  /* A 股：红涨绿跌 */
+  --market-up: oklch(0.55 0.2 25);
+  --market-down: oklch(0.52 0.14 150);
+  --market-flat: oklch(0.55 0.02 250);
+
+  /* 分类图表色 */
+  --chart-1: oklch(0.55 0.14 245);
+  --chart-2: oklch(0.58 0.12 175);
+  --chart-3: oklch(0.62 0.14 55);
+  --chart-4: oklch(0.55 0.16 320);
+  --chart-5: oklch(0.5 0.12 25);
+
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  /* NEW: tech accent */
-  --accent-tech: oklch(0.62 0.18 200); /* cyan accent for tech feel */
-  --card-glow: 0 1px 3px 0 oklch(0 0 0 / 8%); /* subtle elevation in light mode */
-  --card-ring: oklch(0.88 0 0); /* visible card border in light mode */
+
+  /* 侧栏：比内容区深一档 */
+  --sidebar: oklch(0.94 0.01 250);
+  --sidebar-foreground: oklch(0.22 0.02 250);
+  --sidebar-primary: oklch(0.45 0.12 245);
+  --sidebar-primary-foreground: oklch(0.985 0.005 250);
+  --sidebar-accent: oklch(0.9 0.015 250);
+  --sidebar-accent-foreground: oklch(0.22 0.02 250);
+  --sidebar-border: oklch(0.86 0.012 250);
+  --sidebar-ring: oklch(0.45 0.12 245);
+
+  /* 中性 elevation（无彩色 glow） */
+  --card-glow: 0 1px 2px 0 oklch(0.2 0.02 250 / 6%);
+  --card-ring: oklch(0.88 0.01 250);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.623 0.214 259.815);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* 表面：深 canvas，card 略抬升 */
+  --background: oklch(0.14 0.012 250);
+  --foreground: oklch(0.96 0.008 250);
+  --card: oklch(0.19 0.014 250);
+  --card-foreground: oklch(0.96 0.008 250);
+  --popover: oklch(0.19 0.014 250);
+  --popover-foreground: oklch(0.96 0.008 250);
+
+  /* 品牌：暗色提亮 */
+  --primary: oklch(0.68 0.12 245);
+  --primary-foreground: oklch(0.16 0.02 250);
+  --secondary: oklch(0.24 0.015 250);
+  --secondary-foreground: oklch(0.96 0.008 250);
+  --muted: oklch(0.24 0.015 250);
+  --muted-foreground: oklch(0.68 0.02 250);
+  --accent: oklch(0.24 0.018 250);
+  --accent-foreground: oklch(0.96 0.008 250);
+  --destructive: oklch(0.68 0.16 25);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.623 0.214 259.815);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-  /* NEW: tech glow for dark mode */
-  --accent-tech: oklch(0.7 0.18 200);
-  --card-glow: 0 0 14px 0 oklch(0.7 0.18 200 / 22%); /* stronger glow */
-  --card-ring: oklch(1 0 0 / 15%); /* visible card ring in dark mode */
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.68 0.12 245);
+
+  /* 系统语义：提亮、降 chroma */
+  --success: oklch(0.72 0.11 175);
+  --success-foreground: oklch(0.16 0.02 175);
+  --warning: oklch(0.78 0.12 80);
+  --warning-foreground: oklch(0.22 0.04 80);
+  --danger: oklch(0.72 0.14 25);
+  --danger-foreground: oklch(0.16 0.02 25);
+  --info: oklch(0.72 0.1 245);
+  --info-foreground: oklch(0.16 0.02 245);
+
+  /* A 股暗色 */
+  --market-up: oklch(0.7 0.16 25);
+  --market-down: oklch(0.72 0.12 150);
+  --market-flat: oklch(0.65 0.02 250);
+
+  --chart-1: oklch(0.7 0.12 245);
+  --chart-2: oklch(0.72 0.11 175);
+  --chart-3: oklch(0.75 0.12 55);
+  --chart-4: oklch(0.7 0.12 320);
+  --chart-5: oklch(0.68 0.12 25);
+
+  /* 侧栏：比 canvas 再深一档 */
+  --sidebar: oklch(0.12 0.014 250);
+  --sidebar-foreground: oklch(0.94 0.008 250);
+  --sidebar-primary: oklch(0.68 0.12 245);
+  --sidebar-primary-foreground: oklch(0.16 0.02 250);
+  --sidebar-accent: oklch(0.2 0.018 250);
+  --sidebar-accent-foreground: oklch(0.94 0.008 250);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.68 0.12 245);
+
+  --card-glow: 0 1px 2px 0 oklch(0 0 0 / 35%);
+  --card-ring: oklch(1 0 0 / 12%);
 }
 
 @layer base {
@@ -139,18 +202,14 @@
 }
 
 @layer utilities {
-  /* 卡片柔和阴影 — 用于对话区和面板卡片 */
+  /* 卡片中性 elevation — 对话区 / 面板 */
   .card-elevated {
     box-shadow: var(--card-glow);
     border-color: var(--card-ring);
   }
 
-  /* PromptInput 聚焦光晕 */
+  /* PromptInput 聚焦环：跟随 --ring */
   .prompt-focus-ring:focus-within {
-    box-shadow: 0 0 0 3px oklch(0.546 0.245 262.881 / 20%);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 25%, transparent);
   }
-}
-
-.dark .prompt-focus-ring:focus-within {
-  box-shadow: 0 0 0 3px oklch(0.623 0.214 259.815 / 30%);
 }

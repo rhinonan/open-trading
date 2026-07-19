@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Clock, TrendingUp, Building2, MessageCircle, FileText } from "lucide-react";
 
 const MOCK_ACTIVITIES = [
@@ -39,10 +38,10 @@ const MOCK_ACTIVITIES = [
 ];
 
 const typeConfig = {
-  stock: { icon: TrendingUp, color: "text-blue-500 bg-blue-500/10" },
-  industry: { icon: Building2, color: "text-purple-500 bg-purple-500/10" },
-  sentiment: { icon: MessageCircle, color: "text-green-500 bg-green-500/10" },
-  financials: { icon: FileText, color: "text-orange-500 bg-orange-500/10" },
+  stock: { icon: TrendingUp, color: "text-info bg-info/10" },
+  industry: { icon: Building2, color: "text-primary bg-primary/10" },
+  sentiment: { icon: MessageCircle, color: "text-success bg-success/10" },
+  financials: { icon: FileText, color: "text-warning bg-warning/10" },
 };
 
 export function RecentActivity() {

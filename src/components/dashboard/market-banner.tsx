@@ -19,11 +19,11 @@ export function MarketBanner() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{stat.value}</span>
+              <span className="text-2xl font-bold tabular-nums">{stat.value}</span>
               {stat.change && (
                 <span
-                  className={`text-sm font-medium ${
-                    stat.up ? "text-green-500" : "text-red-500"
+                  className={`text-sm font-medium tabular-nums ${
+                    stat.up ? "text-market-up" : "text-market-down"
                   }`}
                 >
                   {stat.up ? (

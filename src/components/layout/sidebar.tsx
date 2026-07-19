@@ -5,6 +5,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useMobile } from "@/hooks/use-mobile";
 import { useSidebar } from "@/hooks/use-sidebar";
+import {
+  SIDEBAR_WIDTH_COLLAPSED,
+  SIDEBAR_WIDTH_EXPANDED,
+} from "./sidebar-width";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -27,37 +31,112 @@ import {
   Menu,
   Radio,
   ScrollText,
+  type LucideIcon,
 } from "lucide-react";
 
-const NAV_ITEMS = [
-  { label: "抖音雷达", href: "/douyin", icon: Radio },
-  { label: "个股分析", href: "/stocks", icon: TrendingUp },
-  { label: "行业分析", href: "/industry", icon: Building2 },
-  { label: "舆情分析", href: "/sentiment", icon: MessageCircle },
-  { label: "财报 & 研报", href: "/financials", icon: FileText },
-  { label: "Agent 管理", href: "/agents", icon: Bot },
-  { label: "Agent 日志", href: "/agents/logs", icon: ScrollText },
-  { label: "设置", href: "/settings", icon: Settings },
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  soon?: boolean;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "监测",
+    items: [{ label: "抖音雷达", href: "/douyin", icon: Radio }],
+  },
+  {
+    label: "研究",
+    items: [
+      { label: "个股分析", href: "/stocks", icon: TrendingUp, soon: true },
+      { label: "行业分析", href: "/industry", icon: Building2, soon: true },
+      { label: "舆情分析", href: "/sentiment", icon: MessageCircle, soon: true },
+      { label: "财报 & 研报", href: "/financials", icon: FileText, soon: true },
+    ],
+  },
+  {
+    label: "系统",
+    items: [
+      { label: "Agent 管理", href: "/agents", icon: Bot },
+      { label: "Agent 日志", href: "/agents/logs", icon: ScrollText },
+      { label: "设置", href: "/settings", icon: Settings },
+    ],
+  },
 ];
+
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
+
+function NavLink({
+  item,
+  collapsed,
+  isActive,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+  isActive: boolean;
+}) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        item.soon && !isActive && "opacity-55",
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        collapsed && "justify-center px-2"
+      )}
+    >
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+        />
+      )}
+      <item.icon className="h-5 w-5 shrink-0" />
+      {!collapsed && (
+        <>
+          <span className="truncate flex-1">{item.label}</span>
+          {item.soon && (
+            <span className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+              Soon
+            </span>
+          )}
+        </>
+      )}
+    </Link>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const isMobile = useMobile();
   const { collapsed, toggle } = useSidebar();
 
+  // 最长前缀匹配：/agents/logs 不会同时高亮 /agents
+  const matchingItem = ALL_NAV_ITEMS.filter(
+    (it) => pathname === it.href || pathname.startsWith(it.href + "/")
+  ).sort((a, b) => b.href.length - a.href.length)[0];
+
   const sidebarContent = (
     <div
       className={cn(
         "flex h-full flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
       )}
     >
       {/* Logo */}
       <div className="flex h-14 items-center border-b border-sidebar-border px-4">
         {!collapsed && (
-          <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
+          <Link href="/" className="flex items-center gap-2 font-semibold text-base">
             <TrendingUp className="h-5 w-5 text-sidebar-primary" />
-            <span className="font-display uppercase tracking-wide">Open Trading</span>
+            <span className="font-display tracking-tight">Open Trading</span>
           </Link>
         )}
         {collapsed && (
@@ -69,45 +148,42 @@ export function Sidebar() {
 
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-4">
           <TooltipProvider delay={0}>
-            {NAV_ITEMS.map((item) => {
-              // 最长前缀匹配：/agents/logs 不会同时高亮 /agents
-              const matchingItem = NAV_ITEMS.filter(
-                (it) =>
-                  pathname === it.href ||
-                  pathname.startsWith(it.href + "/")
-              ).sort((a, b) => b.href.length - a.href.length)[0];
-              const isActive = item === matchingItem;
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label} className="flex flex-col gap-1">
+                {!collapsed && (
+                  <p className="px-3 mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </p>
+                )}
+                {group.items.map((item) => {
+                  const isActive = item === matchingItem;
 
-              const link = (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70",
-                    collapsed && "justify-center px-2"
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                </Link>
-              );
+                  const link = (
+                    <NavLink
+                      item={item}
+                      collapsed={collapsed}
+                      isActive={isActive}
+                    />
+                  );
 
-              if (collapsed) {
-                return (
-                  <Tooltip key={item.href}>
-                    <TooltipTrigger render={link} />
-                    <TooltipContent side="right">{item.label}</TooltipContent>
-                  </Tooltip>
-                );
-              }
+                  if (collapsed) {
+                    return (
+                      <Tooltip key={item.href}>
+                        <TooltipTrigger render={link} />
+                        <TooltipContent side="right">
+                          {item.label}
+                          {item.soon ? "（即将推出）" : ""}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
 
-              return link;
-            })}
+                  return <div key={item.href}>{link}</div>;
+                })}
+              </div>
+            ))}
           </TooltipProvider>
         </nav>
       </ScrollArea>
@@ -152,7 +228,7 @@ export function Sidebar() {
         >
           <Menu className="h-5 w-5" />
         </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64">
+        <SheetContent side="left" className="p-0 w-56">
           {sidebarContent}
         </SheetContent>
       </Sheet>

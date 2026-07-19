@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/agents": "Agent 管理",
   "/settings": "设置",
   "/settings/douyin": "抖音雷达",
+  "/settings/skills": "Skills",
 };
 
 function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
@@ -47,24 +49,30 @@ export function Header() {
   const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:bg-gradient-to-r after:from-transparent after:via-[var(--accent-tech)]/55 after:to-transparent">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-        {breadcrumbs.map((crumb, i) => (
-          <span key={crumb.href} className="flex items-center gap-1">
-            {i > 0 && <span className="text-muted-foreground/40">/</span>}
-            <span
-              className={cn(
-                i === breadcrumbs.length - 1 && "text-foreground font-medium"
+        {breadcrumbs.map((crumb, i) => {
+          const isLast = i === breadcrumbs.length - 1;
+          return (
+            <span key={crumb.href} className="flex items-center gap-1">
+              {i > 0 && <span className="text-muted-foreground/40">/</span>}
+              {isLast ? (
+                <span className="text-foreground font-medium">{crumb.label}</span>
+              ) : (
+                <Link
+                  href={crumb.href}
+                  className={cn("hover:text-foreground transition-colors")}
+                >
+                  {crumb.label}
+                </Link>
               )}
-            >
-              {crumb.label}
             </span>
-          </span>
-        ))}
+          );
+        })}
       </nav>
 
-      {/* Right side: GitHub 仓库入口 + theme toggle (all viewports) */}
+      {/* Right side: GitHub 仓库入口 + theme toggle */}
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"

@@ -12,9 +12,9 @@ const MOCK_SENTIMENTS = [
 ];
 
 const sentimentConfig = {
-  positive: { icon: TrendingUp, className: "text-green-500 bg-green-500/10" },
-  negative: { icon: TrendingDown, className: "text-red-500 bg-red-500/10" },
-  neutral: { icon: Minus, className: "text-yellow-500 bg-yellow-500/10" },
+  positive: { icon: TrendingUp, className: "text-success bg-success/10" },
+  negative: { icon: TrendingDown, className: "text-danger bg-danger/10" },
+  neutral: { icon: Minus, className: "text-warning bg-warning/10" },
 };
 
 export function SentimentPreview() {
@@ -45,7 +45,7 @@ export function SentimentPreview() {
                   </span>
                   <span className="text-sm font-medium">{item.keyword}</span>
                 </div>
-                <Badge variant="secondary" className="text-xs h-5">
+                <Badge variant="secondary" className="text-xs h-5 tabular-nums">
                   热度 {item.score}
                 </Badge>
               </div>

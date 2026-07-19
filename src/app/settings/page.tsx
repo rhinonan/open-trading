@@ -157,7 +157,7 @@ export default function SettingsPage() {
                 </div>
               ))}
               {llmError && (
-                <p className="text-sm text-red-500 bg-muted/50 rounded-md p-3">{llmError}</p>
+                <p className="text-sm text-danger bg-muted/50 rounded-md p-3">{llmError}</p>
               )}
               {llmMessage && (
                 <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">{llmMessage}</p>

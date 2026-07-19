@@ -245,8 +245,8 @@ export default function SkillsPage() {
   return (
     <div className="space-y-6">
       {/* 安全提示 */}
-      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+      <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <span>
           安装 Skill 即引入可执行代码，请仅从信任来源安装。Skill
           代码在服务器本机执行，可读取 Skill 文件但无宿主环境变量。
@@ -263,7 +263,7 @@ export default function SkillsPage() {
               className={
                 batch.review.verdict === "reject" && batch.review.status === "rejected"
                   ? "border-destructive/30"
-                  : "border-amber-500/30"
+                  : "border-warning/30"
               }
             >
               <CardContent className="pt-4">

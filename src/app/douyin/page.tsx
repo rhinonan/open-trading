@@ -124,11 +124,11 @@ export default function DouyinPage() {
                         <span className="font-semibold truncate">
                           {blogger.nickname}
                         </span>
-                        <span className="text-xs text-muted-foreground shrink-0">
+                        <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
                           {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
                         </span>
                         {blogger.accuracy !== null && (
-                          <Badge variant="secondary" className="shrink-0 text-xs">
+                          <Badge variant="secondary" className="shrink-0 text-xs tabular-nums">
                             准确率 {blogger.accuracy}%
                           </Badge>
                         )}

@@ -73,7 +73,7 @@ export function AddBloggerDialog({
             autoFocus
           />
           {error && (
-            <p className="text-sm text-red-500">{error}</p>
+            <p className="text-sm text-danger">{error}</p>
           )}
         </div>
 

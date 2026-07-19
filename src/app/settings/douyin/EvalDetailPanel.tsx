@@ -1,17 +1,32 @@
 "use client";
 
 import type { PredictionItem, JudgmentResult } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 function JudgmentBadge({ judgment }: { judgment: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    correct: { label: "✓ 正确", cls: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" },
-    mostly_correct: { label: "△ 基本正确", cls: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
-    incorrect: { label: "✗ 错误", cls: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
-    not_yet: { label: "⏳ 待验证", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300" },
-    not_applicable: { label: "N/A", cls: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400" },
+  const map: Record<
+    string,
+    {
+      label: string;
+      variant:
+        | "success"
+        | "info"
+        | "danger"
+        | "warning"
+        | "neutral";
+    }
+  > = {
+    correct: { label: "正确", variant: "success" },
+    mostly_correct: { label: "基本正确", variant: "info" },
+    incorrect: { label: "错误", variant: "danger" },
+    not_yet: { label: "待验证", variant: "warning" },
+    not_applicable: { label: "N/A", variant: "neutral" },
   };
-  const m = map[judgment as JudgmentResult] ?? { label: judgment, cls: "bg-gray-100 text-gray-500" };
-  return <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${m.cls}`}>{m.label}</span>;
+  const m = map[judgment as JudgmentResult] ?? {
+    label: judgment,
+    variant: "neutral" as const,
+  };
+  return <Badge variant={m.variant}>{m.label}</Badge>;
 }
 
 export function EvalDetailPanel({ items }: { items: PredictionItem[] }) {
@@ -37,7 +52,7 @@ export function EvalDetailPanel({ items }: { items: PredictionItem[] }) {
             </div>
           )}
           {item.judgment === "not_yet" && item.verifiableAfter && (
-            <div className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            <div className="mt-1 text-xs text-warning">
               到期日: {item.verifiableAfter}（到期后自动重评）
             </div>
           )}

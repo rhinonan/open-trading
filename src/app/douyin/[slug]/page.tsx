@@ -15,17 +15,13 @@ import type {
 
 const JUDGMENT_CONFIG: Record<
   JudgmentResult,
-  { label: string; color: string; icon: string }
+  { label: string; color: string }
 > = {
-  correct: { label: "正确", color: "text-green-500", icon: "✅" },
-  mostly_correct: {
-    label: "基本正确",
-    color: "text-emerald-500",
-    icon: "💚",
-  },
-  incorrect: { label: "不正确", color: "text-red-500", icon: "❌" },
-  not_applicable: { label: "不涉及", color: "text-gray-400", icon: "—" },
-  not_yet: { label: "待验证", color: "text-amber-500", icon: "⏳" },
+  correct: { label: "正确", color: "text-success" },
+  mostly_correct: { label: "基本正确", color: "text-info" },
+  incorrect: { label: "不正确", color: "text-danger" },
+  not_applicable: { label: "不涉及", color: "text-muted-foreground" },
+  not_yet: { label: "待验证", color: "text-warning" },
 };
 
 export default function BloggerDetailPage({
@@ -267,18 +263,17 @@ export default function BloggerDetailPage({
                     {/* 评判标记 */}
                     {jConfig && (
                       <div className="absolute top-1.5 left-1.5 bg-background/90 text-xs px-1.5 py-0.5 rounded shadow">
-                        <span className={jConfig.color}>{jConfig.icon}</span>{" "}
-                        {jConfig.label}
+                        <span className={jConfig.color}>{jConfig.label}</span>
                       </div>
                     )}
 
                     {work.transcriptStatus === "failed" && !jConfig && (
-                      <div className="absolute top-1.5 left-1.5 bg-red-500/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+                      <div className="absolute top-1.5 left-1.5 bg-danger/90 text-danger-foreground text-[10px] px-1.5 py-0.5 rounded">
                         转写失败
                       </div>
                     )}
                     {work.transcriptStatus === "done" && !jConfig && (
-                      <div className="absolute top-1.5 left-1.5 bg-green-500/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+                      <div className="absolute top-1.5 left-1.5 bg-success/90 text-success-foreground text-[10px] px-1.5 py-0.5 rounded">
                         已转写
                       </div>
                     )}
@@ -309,7 +304,7 @@ export default function BloggerDetailPage({
               <div className="flex h-6 w-full overflow-hidden rounded-full">
                 {judgmentCounts.correct > 0 && (
                   <div
-                    className="bg-green-500 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    className="bg-success flex items-center justify-center text-[10px] font-medium text-success-foreground transition-all tabular-nums"
                     style={{ width: `${(judgmentCounts.correct / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
                     title={`正确 ${judgmentCounts.correct}`}
                   >
@@ -318,7 +313,7 @@ export default function BloggerDetailPage({
                 )}
                 {judgmentCounts.mostly_correct > 0 && (
                   <div
-                    className="bg-blue-500 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    className="bg-info flex items-center justify-center text-[10px] font-medium text-info-foreground transition-all tabular-nums"
                     style={{ width: `${(judgmentCounts.mostly_correct / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
                     title={`基本正确 ${judgmentCounts.mostly_correct}`}
                   >
@@ -327,7 +322,7 @@ export default function BloggerDetailPage({
                 )}
                 {judgmentCounts.incorrect > 0 && (
                   <div
-                    className="bg-red-500 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    className="bg-danger flex items-center justify-center text-[10px] font-medium text-danger-foreground transition-all tabular-nums"
                     style={{ width: `${(judgmentCounts.incorrect / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
                     title={`错误 ${judgmentCounts.incorrect}`}
                   >
@@ -336,7 +331,7 @@ export default function BloggerDetailPage({
                 )}
                 {judgmentCounts.not_yet > 0 && (
                   <div
-                    className="bg-amber-400 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    className="bg-warning flex items-center justify-center text-[10px] font-medium text-warning-foreground transition-all tabular-nums"
                     style={{ width: `${(judgmentCounts.not_yet / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
                     title={`待验证 ${judgmentCounts.not_yet}`}
                   >
@@ -345,7 +340,7 @@ export default function BloggerDetailPage({
                 )}
                 {judgmentCounts.not_applicable > 0 && (
                   <div
-                    className="bg-gray-400 flex items-center justify-center text-[10px] font-medium text-white transition-all"
+                    className="bg-muted-foreground/50 flex items-center justify-center text-[10px] font-medium text-background transition-all tabular-nums"
                     style={{ width: `${(judgmentCounts.not_applicable / (totalJudged + judgmentCounts.not_yet + judgmentCounts.not_applicable)) * 100}%` }}
                     title={`不涉及 ${judgmentCounts.not_applicable}`}
                   >
@@ -355,25 +350,25 @@ export default function BloggerDetailPage({
               </div>
 
               {/* Legend */}
-              <div className="flex flex-wrap gap-3 text-xs">
+              <div className="flex flex-wrap gap-3 text-xs tabular-nums">
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-2.5 rounded bg-green-500" />
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-success" />
                   正确: {judgmentCounts.correct}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-2.5 rounded bg-blue-500" />
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-info" />
                   基本正确: {judgmentCounts.mostly_correct}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-2.5 rounded bg-red-500" />
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-danger" />
                   错误: {judgmentCounts.incorrect}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-2.5 rounded bg-amber-400" />
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-warning" />
                   待验证: {judgmentCounts.not_yet}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-2.5 rounded bg-gray-400" />
+                  <span className="inline-block h-2.5 w-2.5 rounded bg-muted-foreground/50" />
                   不涉及: {judgmentCounts.not_applicable}
                 </span>
               </div>
@@ -382,10 +377,10 @@ export default function BloggerDetailPage({
               <div className="rounded border p-3">
                 <div className="text-sm">
                   <span className="text-muted-foreground">准确率（可评判项）：</span>
-                  <span className="font-bold text-lg ml-1">
+                  <span className="font-bold text-lg ml-1 tabular-nums">
                     {accuracy !== null ? `${accuracy}%` : "暂无数据"}
                   </span>
-                  <span className="text-xs text-muted-foreground ml-2">
+                  <span className="text-xs text-muted-foreground ml-2 tabular-nums">
                     （共 {totalJudged} 条可评判预测）
                   </span>
                 </div>
@@ -453,18 +448,15 @@ function WorkDetailSheet({
     pending: { label: "等待中", className: "bg-muted text-muted-foreground" },
     processing: {
       label: "转写中...",
-      className:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      className: "bg-warning/10 text-warning",
     },
     done: {
       label: "已转写",
-      className:
-        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      className: "bg-success/10 text-success",
     },
     failed: {
       label: "转写失败",
-      className:
-        "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+      className: "bg-danger/10 text-danger",
     },
   };
   const status = statusCfg[work.transcriptStatus] || {
