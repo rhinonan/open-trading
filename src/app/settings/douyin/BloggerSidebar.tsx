@@ -84,34 +84,30 @@ export function BloggerSidebar({
               </div>
               <div className="hidden group-hover:flex items-center gap-0.5">
                 <Tooltip>
-                  <TooltipTrigger>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onScan(b);
-                      }}
-                    >
-                      <Radio className="h-3 w-3" />
-                    </Button>
+                  <TooltipTrigger
+                    render={
+                      <button className="inline-flex shrink-0 items-center justify-center rounded-md hover:bg-accent h-6 w-6" />
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onScan(b);
+                    }}
+                  >
+                    <Radio className="h-3 w-3" />
                   </TooltipTrigger>
                   <TooltipContent>扫描新作品</TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                  <TooltipTrigger>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(b);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
+                  <TooltipTrigger
+                    render={
+                      <button className="inline-flex shrink-0 items-center justify-center rounded-md hover:bg-accent h-6 w-6" />
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(b);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
                   </TooltipTrigger>
                   <TooltipContent>删除博主</TooltipContent>
                 </Tooltip>
