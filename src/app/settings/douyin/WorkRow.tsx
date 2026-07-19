@@ -191,11 +191,10 @@ export function WorkRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  disabled={!canTranscribe}
+                  className={`h-7 w-7 ${!canTranscribe ? "opacity-40" : ""}`}
                 />
               }
-              onClick={onTranscribe}
+              onClick={() => canTranscribe && onTranscribe()}
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </TooltipTrigger>
@@ -214,11 +213,10 @@ export function WorkRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  disabled={!canSummarize}
+                  className={`h-7 w-7 ${!canSummarize ? "opacity-40" : ""}`}
                 />
               }
-              onClick={onSummarize}
+              onClick={() => canSummarize && onSummarize()}
             >
               <Lightbulb className="h-3.5 w-3.5" />
             </TooltipTrigger>
@@ -233,11 +231,10 @@ export function WorkRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  disabled={!canEvaluate}
+                  className={`h-7 w-7 ${!canEvaluate ? "opacity-40" : ""}`}
                 />
               }
-              onClick={onEvaluate}
+              onClick={() => canEvaluate && onEvaluate()}
             >
               <Scale className="h-3.5 w-3.5" />
             </TooltipTrigger>
