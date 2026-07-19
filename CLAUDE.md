@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用命令
 
+- `pnpm setup` / `npm run setup` — **新 clone 一键准备**：检查 Node、无 `.env` 时从 example 复制、创建 `data/`（或 `DATA_ROOT`）、`drizzle-kit push`
 - `npm run dev` — 启动开发服务器（http://localhost:3000）
 - `npm run build` / `npm start` — 生产构建 / 启动
 - `npm run lint` — ESLint
@@ -16,7 +17,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npx tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
 - Docker 部署：`docker compose up -d`（端口 3003，挂载 `./data`）
 
-未配置测试框架。Node >= 22.13.0。运行前需从 `.env.example` 复制 `.env` 并填入密钥（TikHub、newapi、讯飞 ASR）。
+Node >= 22.13.0。新环境推荐：`pnpm install` → `pnpm setup` → 编辑 `.env` 填密钥（TikHub、newapi、讯飞 ASR）→ `pnpm dev`。  
+运行时 `ensureDataRoot()` 会自动创建数据目录；空库表结构仍需 `setup` / `db:push` 写入。
 
 ## 架构总览
 
@@ -58,7 +60,7 @@ API 有全局与单博主两套入口：`/api/douyin/{scan,transcribe,evaluate}`
 以下规矩约束**新增代码**（存量不强制回改），目的是让未来的双形态改造只需要动适配层：
 
 1. **DB 调用一律写 `await`**：即使 better-sqlite3 驱动是同步的，调用处也写 `await db...`（无害），保证将来换异步驱动（libsql / Postgres）时调用面零改动。
-2. **落盘路径一律走 `dataPath()`**（`src/lib/data-root.ts`）：禁止新增 `process.cwd()` 拼 `data/` 路径；数据目录整体位置只由 `DATA_ROOT` 环境变量决定（桌面端将指向 userData 目录）。
+2. **落盘路径一律走 `dataPath()`**（`src/lib/data-root.ts`）：禁止新增 `process.cwd()` 拼 `data/` 路径；数据目录整体位置只由 `DATA_ROOT` 环境变量决定（桌面端将指向 userData 目录）。打开 SQLite / 首次写盘前调用 `ensureDataRoot()`（`db/index.ts`、`mastra/index.ts` 已做）。
 3. **新外部服务的密钥/配置进 settings 表**（经 settings-service 读写），不新增 env-only 读取；env 只作为部署级默认值。
 4. **业务层不感知部署形态**：形态差异（DB 驱动、密钥来源、runner 驱动、数据路径）只允许出现在适配层；业务代码禁止出现 `if (isDesktop)` 之类分支。
 5. **表行类型从 schema 派生**：一律 `typeof <table>.$inferSelect`，禁止手写 interface 再用 `as` 断言。

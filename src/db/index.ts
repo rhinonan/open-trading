@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
-import { dataPath } from "@/lib/data-root";
+import { dataPath, ensureDataRoot } from "@/lib/data-root";
 
+ensureDataRoot();
 const DB_PATH = dataPath("douyin.db");
 
 const sqlite = new Database(DB_PATH);

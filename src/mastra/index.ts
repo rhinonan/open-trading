@@ -10,10 +10,11 @@ import { transcribeWorkWorkflow } from "@/mastra/workflows/transcribe-work-workf
 import { evaluateWorkWorkflow } from "@/mastra/workflows/evaluate-work-workflow";
 import { skillReviewWorkflow } from "@/mastra/workflows/skill-review-workflow";
 import { analyzeImageWorkflow } from "@/mastra/workflows/analyze-image-workflow";
-import { dataPath } from "@/lib/data-root";
+import { dataPath, ensureDataRoot } from "@/lib/data-root";
 
 // 绝对路径 + 正斜杠：与业务库 data/douyin.db 分离，
 // 避免多进程相对路径解析不一致（Windows 反斜杠在 file: URL 中无效）
+ensureDataRoot();
 const storageUrl =
   "file:" + dataPath("mastra.db").replace(/\\/g, "/");
 
