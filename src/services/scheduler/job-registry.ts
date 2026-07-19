@@ -1,47 +1,45 @@
 // src/services/scheduler/job-registry.ts
-// 生产 job 定义占位；Task 5 填充四个 handler
+// 生产 job 定义：profile / scan / pipeline / eval
 import type { JobDefinition } from "./types";
+import { runProfileJob } from "./jobs/profile";
+import { runScanJob } from "./jobs/scan";
+import { runPipelineJob } from "./jobs/pipeline";
+import { runEvalJob } from "./jobs/eval";
 
-/** 生产环境注册表（handler 占位，Task 5 实现） */
-export const SCHEDULE_JOBS: JobDefinition[] = [
+export const JOB_DEFINITIONS: JobDefinition[] = [
   {
     id: "profile",
-    label: "画像",
-    description: "更新博主画像",
+    label: "资料更新",
+    description: "更新启用中博主的昵称/粉丝/头像",
     defaultEnabled: false,
-    defaultCron: "0 3 * * *",
-    handler: async () => {
-      /* Task 5 */
-    },
+    defaultCron: "0 8 * * *",
+    handler: runProfileJob,
   },
   {
     id: "scan",
-    label: "扫描",
-    description: "扫描博主新作品",
+    label: "作品扫描",
+    description: "扫描启用中博主的新作品",
     defaultEnabled: false,
-    defaultCron: "0 */2 * * *",
-    handler: async () => {
-      /* Task 5 */
-    },
+    defaultCron: "30 8 * * *",
+    handler: runScanJob,
   },
   {
     id: "pipeline",
-    label: "处理",
-    description: "转写队列 kick",
+    label: "处理队列",
+    description: "kick 转写/图集观点队列（不重试 failed）",
     defaultEnabled: true,
     defaultCron: "*/15 * * * *",
-    handler: async () => {
-      /* Task 5 */
-    },
+    handler: runPipelineJob,
   },
   {
     id: "eval",
-    label: "评判",
-    description: "预测评判入队",
+    label: "观点评判",
+    description: "新作品入队 + not_yet 重评 + kick",
     defaultEnabled: true,
     defaultCron: "5 17 * * 1-5",
-    handler: async () => {
-      /* Task 5 */
-    },
+    handler: runEvalJob,
   },
 ];
+
+/** @deprecated 使用 JOB_DEFINITIONS */
+export const SCHEDULE_JOBS = JOB_DEFINITIONS;

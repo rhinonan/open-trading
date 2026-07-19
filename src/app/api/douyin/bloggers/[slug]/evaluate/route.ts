@@ -3,11 +3,13 @@ import * as bloggerService from "@/services/douyin/blogger-service";
 import { enqueueForEvaluation } from "@/services/douyin/eval-queue";
 import { getEvalRunner } from "@/services/douyin/eval-runner";
 import { requireAdmin } from "@/lib/admin-auth";
+import { ensureSchedulerStarted } from "@/services/scheduler";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const denied = requireAdmin(req);
   if (denied) return denied;
 
+  ensureSchedulerStarted();
 
   const { slug } = await ctx.params;
   try {

@@ -8,6 +8,7 @@ import {
   countByStatus,
 } from "@/services/douyin/pipeline-queue";
 import { getTranscribeRunner } from "@/services/douyin/pipeline-runner";
+import { ensureSchedulerStarted } from "@/services/scheduler";
 
 export interface EnqueueResult {
   accepted: true;
@@ -19,6 +20,7 @@ export interface EnqueueResult {
 
 /** 全局转写：恢复僵尸 + 唤醒 runner 清空整个 pending 队列 */
 export function startTranscribePendingWorks(): EnqueueResult {
+  ensureSchedulerStarted();
   recoverStaleProcessing();
   getTranscribeRunner().kick();
   return {
@@ -30,6 +32,7 @@ export function startTranscribePendingWorks(): EnqueueResult {
 
 /** 单博主转写：该博主的 failed 重置为 pending（重试语义）后唤醒 */
 export function startTranscribeBloggerWorks(bloggerId: number): EnqueueResult {
+  ensureSchedulerStarted();
   recoverStaleProcessing();
   resetFailedForBlogger(bloggerId);
   getTranscribeRunner().kick();
@@ -45,6 +48,7 @@ export function startTranscribeWork(workId: number): {
   success: boolean;
   error?: string;
 } {
+  ensureSchedulerStarted();
   const r = enqueueWork(workId);
   if (!r.queued) return { success: false, error: r.reason };
   getTranscribeRunner().kick();
