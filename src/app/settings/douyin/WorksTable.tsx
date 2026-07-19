@@ -32,10 +32,39 @@ export function WorksTable({
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const setActionLoading = (workId: number, action: ActionKind, v: boolean) => {
     const key = `${workId}:${action}`;
     setLoadingActions((prev) => (prev[key] === v ? prev : { ...prev, [key]: v }));
+  };
+
+  // Clear selection when blogger changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [bloggerSlug]);
+
+  const pageIds = data?.works.map((w) => w.id) ?? [];
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
   const fetchWorks = useCallback(
@@ -123,6 +152,35 @@ export function WorksTable({
   const handleEvaluate = (work: WorkWithBlogger) =>
     action(work, "evaluate", `/api/douyin/works/${work.id}/evaluate`);
 
+  const batch = async (actionKind: ActionKind) => {
+    const workIds = Array.from(selectedIds);
+    if (workIds.length === 0 || batchLoading) return;
+    setBatchLoading(true);
+    try {
+      const res = await fetch("/api/douyin/works/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workIds, action: actionKind }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        onMessage(
+          `批量完成：成功 ${body.succeeded}/${body.total}` +
+            (body.failed ? `，失败 ${body.failed}` : ""),
+          body.failed ? "error" : "success",
+          { agentLog: true }
+        );
+        setSelectedIds(new Set());
+        fetchWorks(page);
+      } else {
+        onMessage(body.error || "批量失败", "error");
+      }
+    } catch {
+      onMessage("批量请求失败", "error");
+    }
+    setBatchLoading(false);
+  };
+
   // ── Render ───────────────────────────────────────────────
 
   if (!bloggerSlug) {
@@ -137,11 +195,49 @@ export function WorksTable({
 
   return (
     <div className="flex flex-col min-h-0">
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b text-sm bg-muted/30 shrink-0">
+          <span>已选 {selectedIds.size} 项</span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={batchLoading}
+            onClick={() => batch("transcribe")}
+          >
+            批量转写
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={batchLoading}
+            onClick={() => batch("summarize")}
+          >
+            批量提取观点
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={batchLoading}
+            onClick={() => batch("evaluate")}
+          >
+            批量评判
+          </Button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b text-xs text-muted-foreground sticky top-0 bg-background z-10">
-              <th className="text-left font-medium py-2 pl-4 w-10">封面</th>
+              <th className="w-8 pl-2">
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={togglePage}
+                  aria-label="全选本页"
+                />
+              </th>
+              <th className="text-left font-medium py-2 pl-2 w-10">封面</th>
               <th className="text-left font-medium py-2">描述</th>
               <th className="text-left font-medium py-2 w-16">类型</th>
               <th className="text-left font-medium py-2 w-16">时长</th>
@@ -155,7 +251,7 @@ export function WorksTable({
             {loading && !data ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 8 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <td key={j} className="py-2 px-2">
                       <Skeleton className="h-8 w-full" />
                     </td>
@@ -167,6 +263,8 @@ export function WorksTable({
                 <WorkRow
                   key={w.id}
                   work={w}
+                  selected={selectedIds.has(w.id)}
+                  onToggleSelect={() => toggleOne(w.id)}
                   onDetail={() => onOpenDrawer(w)}
                   onTranscribe={() => handleTranscribe(w)}
                   onSummarize={() => handleSummarize(w)}
@@ -181,7 +279,7 @@ export function WorksTable({
             ) : (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="text-center py-12 text-muted-foreground text-sm"
                 >
                   暂无作品

@@ -42,6 +42,8 @@ function formatDuration(ms: number): string {
 
 interface WorkRowProps {
   work: WorkWithBlogger;
+  selected: boolean;
+  onToggleSelect: () => void;
   onDetail: () => void;
   onTranscribe: () => void;
   onSummarize: () => void;
@@ -55,6 +57,8 @@ interface WorkRowProps {
 
 export function WorkRow({
   work,
+  selected,
+  onToggleSelect,
   onDetail,
   onTranscribe,
   onSummarize,
@@ -85,8 +89,18 @@ export function WorkRow({
 
   return (
     <tr className="border-b hover:bg-muted/30 transition-colors">
+      {/* 选择 */}
+      <td className="py-2 pl-2">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          aria-label="选择作品"
+        />
+      </td>
+
       {/* 封面 */}
-      <td className="py-2 pl-4">
+      <td className="py-2 pl-2">
         {work.coverUrl ? (
           <img
             src={work.coverUrl}
