@@ -20,6 +20,10 @@ export async function setSetting(key: string, value: string): Promise<void> {
     .run();
 }
 
+export async function deleteSetting(key: string): Promise<void> {
+  await db.delete(settings).where(eq(settings.key, key)).run();
+}
+
 export type LlmFlow = "opinion" | "evaluation" | "skills-review" | "imageOpinion";
 
 export const LLM_MODEL_KEYS: Record<LlmFlow, string> = {

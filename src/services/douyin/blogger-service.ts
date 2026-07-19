@@ -17,6 +17,32 @@ export async function listBloggers(): Promise<DouyinBlogger[]> {
     .all();
 }
 
+export async function listEnabledBloggers(): Promise<DouyinBlogger[]> {
+  return db
+    .select()
+    .from(bloggers)
+    .where(eq(bloggers.disabled, 0))
+    .orderBy(desc(bloggers.followerCount))
+    .all();
+}
+
+export async function setBloggerDisabled(
+  slug: string,
+  disabled: boolean
+): Promise<DouyinBlogger> {
+  const updated = db
+    .update(bloggers)
+    .set({
+      disabled: disabled ? 1 : 0,
+      updatedAt: Math.floor(Date.now() / 1000),
+    })
+    .where(eq(bloggers.slug, slug))
+    .returning()
+    .get();
+  if (!updated) throw new Error(`博主 ${slug} 不存在`);
+  return updated;
+}
+
 export async function getBloggerBySlug(
   slug: string
 ): Promise<DouyinBlogger | null> {
