@@ -3,6 +3,7 @@ import * as bloggerService from "@/services/douyin/blogger-service";
 import { db } from "@/db";
 import { works, predictionItems } from "@/db/schema";
 import { eq, desc, and, ne } from "drizzle-orm";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -77,6 +78,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+
   try {
     const { douyinUid } = await request.json();
     if (!douyinUid || typeof douyinUid !== "string") {

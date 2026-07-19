@@ -10,8 +10,11 @@ import {
   markWorkFailed,
   type ClaimedWork,
 } from "@/services/douyin/pipeline-queue";
+import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 
 const CONCURRENCY = 2;
+const TRANSCRIBE_WORKFLOW_ID = "transcribeWorkWorkflow";
+const ANALYZE_IMAGE_WORKFLOW_ID = "analyzeImageWorkflow";
 
 export interface Runner {
   kick(): void;
@@ -39,7 +42,13 @@ export function createRunner(opts: RunnerOptions): Runner {
         await opts.processWork(claimed);
       } catch (err) {
         // processWork 不应抛出；兜底防止单个任务击穿 worker
-        console.error(`[pipeline-runner] [${claimed.awemeId}] 处理异常:`, err);
+        llmLogError({
+          event: "runner.work.unhandled",
+          workflowId: TRANSCRIBE_WORKFLOW_ID,
+          workId: claimed.id,
+          awemeId: claimed.awemeId,
+          error: err,
+        });
         markWorkFailed(claimed.id, dbi);
       }
     }
@@ -62,7 +71,13 @@ export function createRunner(opts: RunnerOptions): Runner {
     }
     running = true;
     void loop()
-      .catch((err) => console.error("[pipeline-runner] loop crashed:", err))
+      .catch((err) =>
+        llmLogError({
+          event: "runner.loop.crashed",
+          workflowId: TRANSCRIBE_WORKFLOW_ID,
+          error: err,
+        }),
+      )
       .finally(() => {
         running = false;
         if (wake) kick();
@@ -88,14 +103,25 @@ function workflowErrorMessage(result: {
  *  自身消化所有错误（失败回写 DB），不抛出 */
 async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
   const { id, awemeId, videoUrl, duration, desc, mediaType, imageUrls } = work;
-  const logPrefix = `[${awemeId}]`;
+  const timer = startTimer();
+  let runId: string | undefined;
+  let workflowId = TRANSCRIBE_WORKFLOW_ID;
   try {
     if (mediaType === 4) {
       // 视频：走现有转写 workflow；缺下载地址视为失败（而非误入图集分支）
       if (!videoUrl) {
         throw new Error("视频作品缺少下载地址（videoUrl 为空）");
       }
-      const run = await mastra.getWorkflow("transcribeWorkWorkflow").createRun();
+      workflowId = TRANSCRIBE_WORKFLOW_ID;
+      const run = await mastra.getWorkflow(workflowId).createRun();
+      runId = run.runId;
+      llmLog("info", {
+        event: "workflow.run.start",
+        workflowId,
+        runId,
+        workId: id,
+        awemeId,
+      });
       const result = await run.start({
         inputData: { workId: id, awemeId, videoUrl, duration, desc },
       });
@@ -103,25 +129,57 @@ async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
         throw new Error(workflowErrorMessage(result));
       }
       // done 状态与 transcript/opinionSummary 由 workflow 末步回写 DB
-      console.log(`${logPrefix} ✅ 转写完成`);
+      llmLog("info", {
+        event: "workflow.run.success",
+        workflowId,
+        runId,
+        workId: id,
+        awemeId,
+        latencyMs: timer.elapsedMs(),
+        status: "success",
+      });
     } else if (mediaType === 2) {
       // 图集：走图片分析 workflow（imageUrls 列存 JSON 数组字符串，解析后传入）
       const parsedUrls: string[] = JSON.parse(imageUrls || "[]");
-      const run = await mastra.getWorkflow("analyzeImageWorkflow").createRun();
+      workflowId = ANALYZE_IMAGE_WORKFLOW_ID;
+      const run = await mastra.getWorkflow(workflowId).createRun();
+      runId = run.runId;
+      llmLog("info", {
+        event: "workflow.run.start",
+        workflowId,
+        runId,
+        workId: id,
+        awemeId,
+      });
       const result = await run.start({
         inputData: { workId: id, awemeId, desc, imageUrls: parsedUrls },
       });
       if (result.status !== "success") {
         throw new Error(workflowErrorMessage(result));
       }
-      console.log(`${logPrefix} ✅ 图集分析完成`);
+      llmLog("info", {
+        event: "workflow.run.success",
+        workflowId,
+        runId,
+        workId: id,
+        awemeId,
+        latencyMs: timer.elapsedMs(),
+        status: "success",
+      });
     } else {
       // 未知媒体类型：显式失败，避免误路由或卡死在 processing
       throw new Error(`未知 mediaType: ${mediaType}`);
     }
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`${logPrefix} ❌ 失败: ${errorMsg}`);
+    llmLogError({
+      event: "workflow.run.failed",
+      workflowId,
+      runId,
+      workId: id,
+      awemeId,
+      latencyMs: timer.elapsedMs(),
+      error: err,
+    });
     markWorkFailed(id);
   }
 }

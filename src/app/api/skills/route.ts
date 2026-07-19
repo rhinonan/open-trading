@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
 import { mastra } from "@/mastra";
+import { requireAdmin } from "@/lib/admin-auth";
+import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 
 export async function GET() {
   try {
@@ -16,6 +18,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
   try {
     const { url } = await req.json();
     if (!url || typeof url !== "string" || !url.trim()) {
@@ -27,7 +32,33 @@ export async function POST(req: NextRequest) {
 
     // 2. 触发审查
     const run = await mastra.getWorkflow("skillReviewWorkflow").createRun();
-    await run.start({ inputData: { batchId: batch.batchId } });
+    const timer = startTimer();
+    llmLog("info", {
+      event: "workflow.run.start",
+      workflowId: "skillReviewWorkflow",
+      runId: run.runId,
+      batchId: batch.batchId,
+    });
+    const result = await run.start({ inputData: { batchId: batch.batchId } });
+    if (result.status !== "success") {
+      llmLogError({
+        event: "workflow.run.failed",
+        workflowId: "skillReviewWorkflow",
+        runId: run.runId,
+        batchId: batch.batchId,
+        latencyMs: timer.elapsedMs(),
+        error: result.status === "failed" ? result.error : result.status,
+      });
+    } else {
+      llmLog("info", {
+        event: "workflow.run.success",
+        workflowId: "skillReviewWorkflow",
+        runId: run.runId,
+        batchId: batch.batchId,
+        latencyMs: timer.elapsedMs(),
+        status: "success",
+      });
+    }
 
     // 3. 返回批次信息
     const stagingInfo = skillService.getStaging(batch.batchId);

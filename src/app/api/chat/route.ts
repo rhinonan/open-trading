@@ -1,10 +1,14 @@
 import { mastra } from "@/mastra";
 import { handleChatStream } from "@mastra/ai-sdk";
 import { createUIMessageStreamResponse } from "ai";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const agentKey = searchParams.get("agentKey");

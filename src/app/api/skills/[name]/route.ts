@@ -1,6 +1,7 @@
 // src/app/api/skills/[name]/route.ts
 import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(
   _req: NextRequest,
@@ -23,6 +24,9 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ name: string }> }
 ) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
   try {
     const { name } = await ctx.params;
     const { action } = await req.json();
@@ -39,9 +43,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ name: string }> }
 ) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
   try {
     const { name } = await ctx.params;
     // 检查 staging 中是否存在同名批次

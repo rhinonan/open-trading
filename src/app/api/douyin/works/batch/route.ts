@@ -1,7 +1,12 @@
 // src/app/api/douyin/works/batch/route.ts
 import { batchOperate } from "@/services/douyin/works-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+
   try {
     const body = await request.json();
     const { workIds, action } = body;

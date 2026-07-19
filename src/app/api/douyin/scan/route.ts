@@ -1,7 +1,12 @@
 // src/app/api/douyin/scan/route.ts
 import { scanAllBloggers } from "@/services/douyin/scanner-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+
   try {
     const results = await scanAllBloggers();
     const totalNew = results.reduce((sum, r) => sum + r.newWorks, 0);

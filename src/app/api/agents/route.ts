@@ -1,6 +1,7 @@
 // src/app/api/agents/route.ts
 import { mastra } from "@/mastra";
-import { AGENT_META } from "@/mastra/agent-meta";
+import { AGENT_META, type AgentKey } from "@/mastra/agent-meta";
+import { isAgentKey } from "@/mastra/get-agent";
 import { getLlmModel } from "@/services/settings-service";
 
 export async function GET() {
@@ -8,7 +9,7 @@ export async function GET() {
     const agents = mastra.listAgents();
     const list = await Promise.all(
       Object.entries(agents).map(async ([key, agent]) => {
-        const meta = AGENT_META[key];
+        const meta = isAgentKey(key) ? AGENT_META[key as AgentKey] : undefined;
         const instructions = await agent.getInstructions();
         return {
           key,

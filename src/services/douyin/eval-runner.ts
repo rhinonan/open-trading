@@ -14,10 +14,12 @@ import {
 import { getSetting, setSetting } from "@/services/settings-service";
 import { parseCron, cronMatches } from "@/lib/cron-matcher";
 import { mastra } from "@/mastra";
+import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 
 const CONCURRENCY = 1; // 东财限流 + sandbox，串行唯一选择
 const DEFAULT_CRON = "5 17 * * 1-5";
 const TICK_INTERVAL_MS = 60_000; // 每分钟 tick 一次
+const WORKFLOW_ID = "evaluateWorkWorkflow";
 
 /** 执行 Mastra evaluateWorkWorkflow；自身消化所有错误（失败回写 DB），不抛出 */
 async function runEvalWorkflow(
@@ -25,10 +27,18 @@ async function runEvalWorkflow(
   dbi: Db = db,
 ): Promise<void> {
   const { id, awemeId } = work;
+  const timer = startTimer();
+  let runId: string | undefined;
   try {
-    const run = await mastra
-      .getWorkflow("evaluateWorkWorkflow")
-      .createRun();
+    const run = await mastra.getWorkflow(WORKFLOW_ID).createRun();
+    runId = run.runId;
+    llmLog("info", {
+      event: "workflow.run.start",
+      workflowId: WORKFLOW_ID,
+      runId,
+      workId: id,
+      awemeId,
+    });
     const result = await run.start({
       inputData: {
         workId: id,
@@ -47,8 +57,25 @@ async function runEvalWorkflow(
           : `status: ${result.status}`,
       );
     }
+    llmLog("info", {
+      event: "workflow.run.success",
+      workflowId: WORKFLOW_ID,
+      runId,
+      workId: id,
+      awemeId,
+      latencyMs: timer.elapsedMs(),
+      status: "success",
+    });
   } catch (err) {
-    console.error(`[eval:${awemeId}] 失败:`, err);
+    llmLogError({
+      event: "workflow.run.failed",
+      workflowId: WORKFLOW_ID,
+      runId,
+      workId: id,
+      awemeId,
+      latencyMs: timer.elapsedMs(),
+      error: err,
+    });
     markEvalFailed(id, dbi);
   }
 }
@@ -115,16 +142,23 @@ export function createRunner(opts: RunnerOptions = {}): Runner {
 
       if (!shouldFire) return;
 
-      console.log("[eval-runner] cron 触发定时评判");
+      llmLog("info", { event: "eval.cron.fire", workflowId: WORKFLOW_ID });
       const newCount = enqueueForEvaluation({}, dbi);
       const reEvalCount = enqueueReevaluation(dbi);
-      console.log(
-        `[eval-runner] 入队: ${newCount} 新作品, ${reEvalCount} 到期重评`
-      );
+      llmLog("info", {
+        event: "eval.cron.enqueued",
+        workflowId: WORKFLOW_ID,
+        newCount,
+        reEvalCount,
+      });
       await setSetting("eval_last_run_at", String(now));
       kick();
     } catch (err) {
-      console.error("[eval-runner] tick error:", err);
+      llmLogError({
+        event: "eval.cron.tick_error",
+        workflowId: WORKFLOW_ID,
+        error: err,
+      });
     }
   }
 
@@ -135,7 +169,13 @@ export function createRunner(opts: RunnerOptions = {}): Runner {
     }
     running = true;
     void loop()
-      .catch((err) => console.error("[eval-runner] loop crashed:", err))
+      .catch((err) =>
+        llmLogError({
+          event: "runner.loop.crashed",
+          workflowId: WORKFLOW_ID,
+          error: err,
+        }),
+      )
       .finally(() => {
         running = false;
         if (wake) kick();

@@ -1,7 +1,12 @@
 import { enqueueForEvaluation } from "@/services/douyin/eval-queue";
 import { getEvalRunner } from "@/services/douyin/eval-runner";
+import { requireAdmin } from "@/lib/admin-auth";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+
   try {
     const count = enqueueForEvaluation();
     getEvalRunner().kick();

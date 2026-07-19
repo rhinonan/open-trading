@@ -47,9 +47,13 @@ API 有全局与单博主两套入口：`/api/douyin/{scan,transcribe,evaluate}`
 
 ### Mastra 约定
 
-- 所有 agent / workflow 注册在 `src/mastra/index.ts`；新增 agent 还须在 `src/mastra/agent-meta.ts` 的 `AGENT_META` 补一行（agents 页面据此展示）。
+- 所有 agent / workflow 注册在 `src/mastra/index.ts`；新增 agent 还须在 `src/mastra/agent-meta.ts` 的 `AGENT_META` / `AGENT_KEYS` 补同一 **注册键**（agents 页面与 skills 挂载据此展示）。
+- **命名合同**：注册键 camelCase（`opinionAgent`）用于 `getAgent` / `listAgents` / `AGENT_META` / skills mount / `?agentKey=`；Agent `id` kebab-case（`opinion-agent`）仅 Mastra/chat 内部 `agentId`。业务路径经 `getRegisteredAgent(key)` 或 `mastra.getAgent(key)` 调用，禁止 `import { xxxAgent } from agents` 后直接 `.generate`（仅 `index.ts` 注册与测试可 import 单例）。
 - 模型不硬编码：统一走 `newapiModel(flow)`（`src/mastra/model.ts`），每次请求时从 settings 表读取该流程配置的模型 id，经 newapi（OpenAI-compatible 网关，`NEWAPI_BASE_URL` / `NEWAPI_API_KEY`）调用。流程枚举 `LlmFlow` 定义在 `src/services/settings-service.ts`。
+- LLM/workflow 结构化日志：`src/lib/llm-log.ts`（JSON 一行；含 `runId`/`workId`/`awemeId`/`batchId`/`agentKey`/`workflowId`/`model`/`latencyMs` 等；禁止打 apiKey）。
+- Agent 调用日志 UI：`@mastra/observability` + `MastraStorageExporter` 写 `mastra.db`/`mastra_ai_spans`；页面 `/agents/logs`，API `/api/agents/logs`（列表 root `AGENT_RUN`）与 `/api/agents/logs/[traceId]`（详情）。与业务 `llm-log`、workflow snapshot `/api/agents/runs` 分层，勿混用。
 - 聊天走 `/api/chat?agentKey=<key>`，用 `@mastra/ai-sdk` 的 `handleChatStream` 流式输出；前端在 `src/components/agents` + ai-elements / streamdown。
+- 写操作鉴权：`src/lib/admin-auth.ts`。未设 `ADMIN_TOKEN` 时放行；设置后写接口需 `Authorization: Bearer …` 或 `x-admin-token`。
 - `next.config.ts` 的 `serverExternalPackages` 排除了 `@mastra/*`（Node-only 依赖），新增此类依赖时照做。
 
 ### 其他

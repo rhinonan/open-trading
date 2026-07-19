@@ -4,7 +4,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { works, predictionItems, bloggers } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { evaluatorAgent } from "@/mastra/agents/evaluator-agent";
+import { getRegisteredAgent } from "@/mastra/get-agent";
+import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 
 const workflowInputSchema = z.object({
   workId: z.number(),
@@ -17,6 +18,35 @@ const workflowInputSchema = z.object({
 });
 
 type WorkflowInput = z.infer<typeof workflowInputSchema>;
+
+/**
+ * 评判 evidence 字段合同（P0-3）。
+ * 旧库中可能是任意 JSON 对象；展示侧按字符串原样显示，解析失败不炸页。
+ * 允许有限 extra 扩展，避免 agent 偶发附加字段导致整次 generate 失败。
+ */
+export const evidenceSchema = z
+  .object({
+    /** 标的代码或名称，如 000001 / 上证指数 */
+    symbol: z.string().optional().describe("标的代码或名称"),
+    /** 观察区间起点 YYYY-MM-DD */
+    rangeStart: z.string().optional().describe("观察区间起点 YYYY-MM-DD"),
+    /** 观察区间终点 YYYY-MM-DD */
+    rangeEnd: z.string().optional().describe("观察区间终点 YYYY-MM-DD"),
+    /** 关键价/点位（发布日附近） */
+    openPrice: z.number().optional().describe("关键价/点位"),
+    /** 收盘价/点位（验证日） */
+    closePrice: z.number().optional().describe("收盘价/点位"),
+    /** 区间涨跌幅（百分比数值，如 2.5 表示 +2.5%） */
+    changePercent: z.number().optional().describe("区间涨跌幅百分比"),
+    /** 数据源标识，如 tencent / mootdx / eastmoney */
+    source: z.string().optional().describe("数据源"),
+    /** 取数时间 ISO 或可读字符串 */
+    fetchedAt: z.string().optional().describe("取数时间"),
+    /** 补充说明 */
+    notes: z.string().optional().describe("补充说明"),
+  })
+  .catchall(z.unknown())
+  .describe("支撑判定的行情数据快照");
 
 // 预测条目输出 schema
 const predictionsSchema = z.object({
@@ -39,10 +69,7 @@ const predictionsSchema = z.object({
         .optional()
         .describe("YYYY-MM-DD，not_yet 时必填"),
       reasoning: z.string().describe("判定理由"),
-      evidence: z
-        .object({})
-        .passthrough()
-        .describe("支撑判定的行情数据快照"),
+      evidence: evidenceSchema,
     }),
   ),
 });
@@ -54,7 +81,13 @@ const prepareStep = createStep({
   outputSchema: workflowInputSchema.extend({ bloggerNickname: z.string() }),
   execute: async ({ inputData }) => {
     const { workId, awemeId } = inputData;
-    console.log(`[eval:${awemeId}] 准备评判 #${workId}...`);
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: "evaluate-work",
+      stepId: "eval-prepare",
+      workId,
+      awemeId,
+    });
 
     const blogger = db
       .select({ nickname: bloggers.nickname })
@@ -95,17 +128,49 @@ const judgeStep = createStep({
       publishedAt,
       bloggerNickname,
     });
-    console.log(`[eval:${awemeId}] 开始 agentic 评判...`);
 
-    const result = await evaluatorAgent.generate(prompt, {
+    const timer = startTimer();
+    llmLog("info", {
+      event: "agent.generate.start",
+      agentKey: "evaluatorAgent",
+      workflowId: "evaluate-work",
+      stepId: "eval-judge",
+      workId,
+      awemeId,
+    });
+
+    const agent = await getRegisteredAgent("evaluatorAgent");
+    const result = await agent.generate(prompt, {
       structuredOutput: { schema: predictionsSchema },
       maxSteps: 15,
       modelSettings: { temperature: 0.3 },
     });
 
     if (!result.object) {
+      llmLogError({
+        event: "agent.generate.failed",
+        agentKey: "evaluatorAgent",
+        workflowId: "evaluate-work",
+        stepId: "eval-judge",
+        workId,
+        awemeId,
+        latencyMs: timer.elapsedMs(),
+        error: "Agent 未返回有效的结构化输出",
+      });
       throw new Error("Agent 未返回有效的结构化输出");
     }
+
+    llmLog("info", {
+      event: "agent.generate.success",
+      agentKey: "evaluatorAgent",
+      workflowId: "evaluate-work",
+      stepId: "eval-judge",
+      workId,
+      awemeId,
+      latencyMs: timer.elapsedMs(),
+      status: "success",
+    });
+
     return result.object as z.infer<typeof predictionsSchema>;
   },
 });
@@ -116,7 +181,7 @@ const persistStep = createStep({
   inputSchema: predictionsSchema,
   outputSchema: z.object({ persisted: z.number() }),
   execute: async ({ inputData, getInitData }) => {
-    const { workId } = getInitData<WorkflowInput>();
+    const { workId, awemeId } = getInitData<WorkflowInput>();
     const { predictions } = inputData;
     const now = Math.floor(Date.now() / 1000);
 
@@ -148,6 +213,16 @@ const persistStep = createStep({
         .run();
 
       return predictions.length;
+    });
+
+    llmLog("info", {
+      event: "workflow.step.success",
+      workflowId: "evaluate-work",
+      stepId: "eval-persist",
+      workId,
+      awemeId,
+      status: "success",
+      persisted: count,
     });
 
     return { persisted: count };
@@ -182,6 +257,7 @@ function buildJudgePrompt(input: {
     ``,
     `请根据以上转写文本，提取所有可验证的行情预测并判定正确性。`,
     `发布日期 ${pubDate} 是时间锚点——取数时以该日期为基准。`,
+    `evidence 请尽量填写 symbol、区间、开收价/涨跌、source、fetchedAt。`,
   ].join("\n");
 }
 

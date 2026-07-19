@@ -51,6 +51,7 @@ const EVALUATOR_INSTRUCTIONS = `你是 A 股行情评判专家。给定抖音博
 - 你需要的数据：作品发布日期前后的指数日 K 线（上证/深成指/创业板）、涉及板块的排名/涨跌、涉及个股的实时价/K 线
 - 优先走 skill 里的腾讯财经 API 和通达信 mootdx（不封 IP），东财接口必须走 skill 里内建的 em_get 限流
 - 每次判定必须在 evidence 字段记录实际取到的关键数据点
+- evidence 优先填：symbol、rangeStart/rangeEnd、openPrice/closePrice、changePercent、source、fetchedAt；其余可放扩展字段
 - 作者发布日期（视频发布时间）是时间锚点：取发布日附近的数据来判断方向是否正确
 - 本机可用 ${pythonCmd} 执行 Python 脚本，工作目录 ${workspaceDir}，脚本超时 120 秒
 

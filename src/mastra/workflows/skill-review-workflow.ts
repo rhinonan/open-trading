@@ -1,12 +1,13 @@
 // src/mastra/workflows/skill-review-workflow.ts
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
-import { skillReviewerAgent } from "@/mastra/agents/skill-reviewer-agent";
+import { getRegisteredAgent } from "@/mastra/get-agent";
 import {
   getStagingFiles,
   writeReviewResult,
   type SkillReviewResult,
 } from "@/services/skills-service";
+import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 
 const workflowInputSchema = z.object({
   batchId: z.string().describe("staging 中的批次 ID"),
@@ -50,10 +51,7 @@ const prepareStep = createStep({
     const { batchId } = inputData;
     const files = getStagingFiles(batchId);
 
-    const parts: string[] = [
-      `## 待审查批次: ${batchId}`,
-      "",
-    ];
+    const parts: string[] = [`## 待审查批次: ${batchId}`, ""];
 
     let totalChars = 0;
     for (const f of files) {
@@ -72,11 +70,19 @@ const prepareStep = createStep({
     }
 
     const prompt = parts.join("\n");
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: "skill-review",
+      stepId: "review-prepare",
+      batchId,
+      fileCount: files.length,
+      totalChars,
+    });
     return { batchId, prompt, fileCount: files.length, totalChars };
   },
 });
 
-// Step 2: review — 调 agent
+// Step 2: review — 调 agent（经 mastra 实例）
 const reviewStep = createStep({
   id: "review-agent",
   inputSchema: z.object({
@@ -89,21 +95,49 @@ const reviewStep = createStep({
   retries: 1,
   execute: async ({ inputData }) => {
     const { batchId, prompt } = inputData;
-    console.log(
-      `[review:${batchId}] 开始审查，${inputData.fileCount} 个文件，共 ${inputData.totalChars} 字符`,
-    );
+    const timer = startTimer();
+    llmLog("info", {
+      event: "agent.generate.start",
+      agentKey: "skillReviewerAgent",
+      workflowId: "skill-review",
+      stepId: "review-agent",
+      batchId,
+      fileCount: inputData.fileCount,
+      totalChars: inputData.totalChars,
+    });
 
     const fullPrompt = `${prompt}\n\n请对以上批次 "${batchId}" 中的所有 Skill 进行安全审查，严格按照 JSON schema 输出审查结果。`;
 
-    const result = await skillReviewerAgent.generate(fullPrompt, {
+    const agent = await getRegisteredAgent("skillReviewerAgent");
+    const result = await agent.generate(fullPrompt, {
       structuredOutput: { schema: reviewOutputSchema },
       maxSteps: 10,
       modelSettings: { temperature: 0.1 },
     });
 
     if (!result.object) {
+      llmLogError({
+        event: "agent.generate.failed",
+        agentKey: "skillReviewerAgent",
+        workflowId: "skill-review",
+        stepId: "review-agent",
+        batchId,
+        latencyMs: timer.elapsedMs(),
+        error: "Agent 未返回有效的审查结果",
+      });
       throw new Error("Agent 未返回有效的审查结果");
     }
+
+    llmLog("info", {
+      event: "agent.generate.success",
+      agentKey: "skillReviewerAgent",
+      workflowId: "skill-review",
+      stepId: "review-agent",
+      batchId,
+      latencyMs: timer.elapsedMs(),
+      status: "success",
+    });
+
     return result.object as z.infer<typeof reviewOutputSchema>;
   },
 });
@@ -135,10 +169,15 @@ const persistStep = createStep({
     };
 
     writeReviewResult(batchId, result);
-    console.log(
-      `[review:${batchId}] 审查${verdict === "pass" ? "通过" : "不通过"}: ${summary}`,
-    );
-    const status = verdict === "pass" ? "passed" as const : "rejected" as const;
+    const status = verdict === "pass" ? ("passed" as const) : ("rejected" as const);
+    llmLog("info", {
+      event: "workflow.step.success",
+      workflowId: "skill-review",
+      stepId: "review-persist",
+      batchId,
+      status,
+      summary,
+    });
     return { status, batchId, summary };
   },
 });

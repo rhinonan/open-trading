@@ -1,7 +1,11 @@
 // src/app/api/agents/test/route.ts
 import { mastra } from "@/mastra";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const body: { agentKey?: unknown; input?: unknown } = await request.json();
 

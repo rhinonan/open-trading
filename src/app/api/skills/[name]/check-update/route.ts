@@ -1,11 +1,15 @@
 // src/app/api/skills/[name]/check-update/route.ts
 import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ name: string }> }
 ) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
   try {
     const { name } = await ctx.params;
     const result = await skillService.checkUpdate(name);

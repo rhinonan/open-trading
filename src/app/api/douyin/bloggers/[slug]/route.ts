@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { works } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import * as bloggerService from "@/services/douyin/blogger-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(
   req: NextRequest,
@@ -29,10 +30,11 @@ export async function GET(
   return Response.json(blogger);
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  ctx: { params: Promise<{ slug: string }> }
-) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
+
   const { slug } = await ctx.params;
   const blogger = await bloggerService.getBloggerBySlug(slug);
   if (!blogger) {

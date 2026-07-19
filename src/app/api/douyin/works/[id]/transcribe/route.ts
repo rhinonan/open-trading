@@ -1,11 +1,13 @@
 // src/app/api/douyin/works/[id]/transcribe/route.ts
 import { NextRequest } from "next/server";
 import { startTranscribeWork } from "@/services/douyin/pipeline-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
-export async function POST(
-  _req: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
+
   try {
     const { id } = await ctx.params;
     const workId = parseInt(id, 10);

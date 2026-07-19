@@ -4,6 +4,7 @@ import {
   setSetting,
   LLM_MODEL_KEYS,
 } from "@/services/settings-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
 async function currentSettings() {
   const [opinionModel, evaluationModel, skillsReviewModel, imageOpinionModel] =
@@ -28,6 +29,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const body: {
       opinionModel?: unknown;
@@ -60,7 +64,10 @@ export async function PUT(request: Request) {
       await setSetting(LLM_MODEL_KEYS.evaluation, body.evaluationModel.trim());
     }
     if (typeof body.skillsReviewModel === "string") {
-      await setSetting(LLM_MODEL_KEYS["skills-review"], body.skillsReviewModel.trim());
+      await setSetting(
+        LLM_MODEL_KEYS["skills-review"],
+        body.skillsReviewModel.trim(),
+      );
     }
     if (typeof body.imageOpinionModel === "string") {
       await setSetting(LLM_MODEL_KEYS.imageOpinion, body.imageOpinionModel.trim());

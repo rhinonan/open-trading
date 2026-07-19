@@ -1,11 +1,15 @@
 // src/app/api/skills/staging/[name]/publish/route.ts
 import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ name: string }> },
 ) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
   try {
     const { name: batchId } = await ctx.params;
     const { names } = await req.json();

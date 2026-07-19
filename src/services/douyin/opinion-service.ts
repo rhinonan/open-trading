@@ -1,7 +1,8 @@
 // src/services/douyin/opinion-service.ts
 import * as fs from "fs";
 import type { ModelMessage } from "ai";
-import { mastra } from "@/mastra";
+import { getRegisteredAgent } from "@/mastra/get-agent";
+import { llmLogError, startTimer, llmLog } from "@/lib/llm-log";
 
 export async function extractOpinion(
   transcript: string,
@@ -11,16 +12,28 @@ export async function extractOpinion(
     return "";
   }
 
+  const timer = startTimer();
   try {
-    const agent = mastra.getAgent("opinionAgent");
+    const agent = await getRegisteredAgent("opinionAgent");
     const prompt = buildTextPrompt(transcript, desc);
     const result = await agent.generate(
       prompt.slice(0, 4000), // 限制输入长度
       { modelSettings: { maxOutputTokens: 200, temperature: 0.3 } }
     );
+    llmLog("info", {
+      event: "agent.generate.success",
+      agentKey: "opinionAgent",
+      latencyMs: timer.elapsedMs(),
+      status: "success",
+    });
     return result.text.trim();
   } catch (err) {
-    console.error("[opinion] LLM 提取观点失败:", err);
+    llmLogError({
+      event: "agent.generate.failed",
+      agentKey: "opinionAgent",
+      latencyMs: timer.elapsedMs(),
+      error: err,
+    });
     return "";
   }
 }
@@ -43,8 +56,9 @@ export async function extractOpinionFromImages(
     return "";
   }
 
+  const timer = startTimer();
   try {
-    const agent = mastra.getAgent("imageOpinionAgent");
+    const agent = await getRegisteredAgent("imageOpinionAgent");
 
     const message: ModelMessage = {
       role: "user",
@@ -61,9 +75,20 @@ export async function extractOpinionFromImages(
     const result = await agent.generate([message], {
       modelSettings: { maxOutputTokens: 200, temperature: 0.3 },
     });
+    llmLog("info", {
+      event: "agent.generate.success",
+      agentKey: "imageOpinionAgent",
+      latencyMs: timer.elapsedMs(),
+      status: "success",
+    });
     return result.text.trim();
   } catch (err) {
-    console.error("[opinion] 图集观点提取失败:", err);
+    llmLogError({
+      event: "agent.generate.failed",
+      agentKey: "imageOpinionAgent",
+      latencyMs: timer.elapsedMs(),
+      error: err,
+    });
     return "";
   }
 }

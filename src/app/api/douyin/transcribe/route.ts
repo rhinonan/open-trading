@@ -3,8 +3,13 @@
 // 进度通过 /api/douyin/works 的 transcriptStatus 轮询。
 // （旧参数 concurrency/maxTasks 已废弃：runner 固定并发，跑到队列清空。）
 import { startTranscribePendingWorks } from "@/services/douyin/pipeline-service";
+import { requireAdmin } from "@/lib/admin-auth";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
+
   try {
     return Response.json(startTranscribePendingWorks());
   } catch (err) {
