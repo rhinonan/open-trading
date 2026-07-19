@@ -37,22 +37,20 @@ export default function SkillsPage() {
     const sData = await sRes.json();
     const mData = await mRes.json();
     if (sData.success) setSkills(sData.skills);
+    else throw new Error(sData.error || "加载 Skill 列表失败");
     if (mData.success) setMounts(mData.mounts);
+    else throw new Error(mData.error || "加载挂载配置失败");
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [sRes, mRes] = await Promise.all([
-          fetch("/api/skills"),
-          fetch("/api/skills/mounts"),
-        ]);
-        const sData = await sRes.json();
-        const mData = await mRes.json();
-        if (cancelled) return;
-        if (sData.success) setSkills(sData.skills);
-        if (mData.success) setMounts(mData.mounts);
+        await refresh();
+      } catch (e) {
+        if (!cancelled) {
+          setMessage(e instanceof Error ? e.message : "加载失败");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -60,17 +58,26 @@ export default function SkillsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refresh]);
 
   async function handleToggle(name: string, currentEnabled: boolean) {
-    await fetch(`/api/skills/${encodeURIComponent(name)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: currentEnabled ? "disable" : "enable",
-      }),
-    });
-    await refresh();
+    try {
+      const res = await fetch(`/api/skills/${encodeURIComponent(name)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: currentEnabled ? "disable" : "enable",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        setMessage(data.error || "切换启用状态失败");
+        return;
+      }
+      await refresh();
+    } catch {
+      setMessage("切换启用状态失败");
+    }
   }
 
   async function handleUpdate(skill: SkillRow) {
@@ -102,11 +109,19 @@ export default function SkillsPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await fetch(`/api/skills/${encodeURIComponent(deleteTarget.name)}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/skills/${encodeURIComponent(deleteTarget.name)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        setMessage(data.error || "删除失败");
+        return;
+      }
       setDeleteTarget(null);
       await refresh();
+    } catch {
+      setMessage("删除失败");
     } finally {
       setDeleting(false);
     }
@@ -152,7 +167,9 @@ export default function SkillsPage() {
         onOpenChange={setInstallOpen}
         onInstalled={() => {
           setMessage(null);
-          void refresh();
+          void refresh().catch((e) =>
+            setMessage(e instanceof Error ? e.message : "刷新失败"),
+          );
         }}
         mode={installMode}
         initialUrl={installUrl}
@@ -168,11 +185,15 @@ export default function SkillsPage() {
           skillName={mountTarget.name}
           mounts={mounts}
           onSave={async (next) => {
-            await fetch("/api/skills/mounts", {
+            const res = await fetch("/api/skills/mounts", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ mounts: next }),
             });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.success === false) {
+              throw new Error(data.error || "保存挂载失败");
+            }
             setMounts(next);
           }}
         />
@@ -181,10 +202,10 @@ export default function SkillsPage() {
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open && !deleting) setDeleteTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent showCloseButton={!deleting}>
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>

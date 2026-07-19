@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertTriangle,
   Loader2,
@@ -92,20 +92,23 @@ function Stepper({ step }: { step: Step }) {
   );
 }
 
-export function InstallSkillDialog({
-  open,
+/**
+ * 弹窗内容：每次 open 由外层 key remount，避免 effect 内 setState 重置。
+ * discardBatchIdRef 记录待放弃的 staging；成功 publish 后清空，防止
+ * DELETE /api/skills/<batchId> 在 batchId===skillName 时误删正式 skill。
+ */
+function InstallSkillDialogBody({
   onOpenChange,
   onInstalled,
-  mode = "create",
-  initialUrl = "",
-  overwrite = false,
+  mode,
+  initialUrl,
+  overwrite,
 }: {
-  open: boolean;
   onOpenChange: (open: boolean) => void;
   onInstalled: () => void;
-  mode?: "create" | "update";
-  initialUrl?: string;
-  overwrite?: boolean;
+  mode: "create" | "update";
+  initialUrl: string;
+  overwrite: boolean;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [url, setUrl] = useState(initialUrl);
@@ -114,21 +117,22 @@ export function InstallSkillDialog({
   const [batchId, setBatchId] = useState<string | null>(null);
   const [batch, setBatch] = useState<StagingBatch | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const discardBatchIdRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setStep(1);
-    setUrl(initialUrl);
-    setBusy(false);
-    setError("");
-    setBatchId(null);
-    setBatch(null);
-    setSelected(new Set());
-  }, [open, initialUrl]);
+  function setBusyBoth(v: boolean) {
+    busyRef.current = v;
+    setBusy(v);
+  }
+
+  function setBatchIdTracked(id: string | null) {
+    discardBatchIdRef.current = id;
+    setBatchId(id);
+  }
 
   async function startInstall() {
     if (!url.trim()) return;
-    setBusy(true);
+    setBusyBoth(true);
     setError("");
     setStep(2);
     try {
@@ -137,7 +141,6 @@ export function InstallSkillDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: url.trim(),
-          // create / update 均 force，避免残留 staging 挡道
           force: true,
         }),
       });
@@ -149,7 +152,7 @@ export function InstallSkillDialog({
       }
       const b = data.batch as StagingBatch;
       setBatch(b);
-      setBatchId(b.batchId);
+      setBatchIdTracked(b.batchId);
       const names = (b.candidates ?? []).map((c) => c.name);
       setSelected(new Set(names));
       if (b.review?.verdict === "pass") {
@@ -161,13 +164,13 @@ export function InstallSkillDialog({
       setError("网络错误");
       setStep(1);
     } finally {
-      setBusy(false);
+      setBusyBoth(false);
     }
   }
 
   async function reReview() {
     if (!batchId) return;
-    setBusy(true);
+    setBusyBoth(true);
     setError("");
     try {
       const res = await fetch(`/api/skills/staging/${batchId}/review`, {
@@ -193,7 +196,7 @@ export function InstallSkillDialog({
     } catch {
       setError("网络错误");
     } finally {
-      setBusy(false);
+      setBusyBoth(false);
     }
   }
 
@@ -204,7 +207,7 @@ export function InstallSkillDialog({
       setError("请至少选择一个 Skill");
       return;
     }
-    setBusy(true);
+    setBusyBoth(true);
     setError("");
     try {
       const res = await fetch(`/api/skills/staging/${batchId}/publish`, {
@@ -231,23 +234,27 @@ export function InstallSkillDialog({
             : String(data.errors),
         );
       }
+      // 成功发布后清空 discard 目标，避免误删正式 skill
+      setBatchIdTracked(null);
       onOpenChange(false);
       onInstalled();
     } catch {
       setError("网络错误");
     } finally {
-      setBusy(false);
+      setBusyBoth(false);
     }
   }
 
   async function discardAndClose() {
-    if (batchId) {
+    const id = discardBatchIdRef.current;
+    if (id) {
       try {
-        await fetch(`/api/skills/${batchId}`, { method: "DELETE" });
+        await fetch(`/api/skills/${id}`, { method: "DELETE" });
       } catch {
-        // ignore discard errors on close
+        // ignore
       }
     }
+    discardBatchIdRef.current = null;
     onOpenChange(false);
   }
 
@@ -265,12 +272,15 @@ export function InstallSkillDialog({
   const rejected =
     review &&
     (review.verdict === "reject" || review.status === "rejected");
+  // 非 pass 的 step2 都允许重新审查（含 pending/未知）
+  const canReReview = step === 2 && batchId && review?.verdict !== "pass";
 
   return (
     <Dialog
-      open={open}
+      open
       onOpenChange={(next) => {
         if (!next) {
+          if (busyRef.current) return;
           void discardAndClose();
           return;
         }
@@ -305,100 +315,77 @@ export function InstallSkillDialog({
 
         {step === 1 && (
           <div className="space-y-3">
-            <label className="text-sm font-medium" htmlFor="skill-source-url">
-              仓库 URL
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium">GitHub 仓库 URL</span>
+              <Input
+                id="skill-github-url"
+                type="url"
+                placeholder="https://github.com/owner/repo"
+                value={url}
+                disabled={mode === "update" || busy}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void startInstall();
+                }}
+              />
             </label>
-            <Input
-              id="skill-source-url"
-              type="url"
-              placeholder="https://github.com/owner/repo"
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !busy && url.trim()) {
-                  void startInstall();
-                }
-              }}
-              disabled={busy || (mode === "update" && !!initialUrl)}
-              autoFocus
-            />
-            <p className="text-xs text-muted-foreground">
-              支持公开 GitHub 仓库地址；安装前会自动跑安全审查。
-            </p>
+            {mode === "update" && (
+              <p className="text-xs text-muted-foreground">
+                更新模式下来源地址已锁定
+              </p>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={busy}
+              >
+                取消
+              </Button>
+              <Button
+                onClick={() => void startInstall()}
+                disabled={busy || !url.trim()}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    处理中...
+                  </>
+                ) : (
+                  "下一步：下载并审查"
+                )}
+              </Button>
+            </DialogFooter>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-3">
-            {busy && !batch ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                正在下载并审查…
+            {busy && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                审查中...
               </div>
-            ) : batch ? (
+            )}
+            {!busy && review && (
               <>
                 <div className="flex items-center gap-2 text-sm">
-                  {rejected ? (
-                    <>
-                      <XCircle className="h-4 w-4 text-destructive" />
-                      <span className="font-medium text-destructive">
-                        审查未通过
-                      </span>
-                    </>
-                  ) : review?.verdict === "pass" ? (
-                    <>
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                      <span className="font-medium">审查通过</span>
-                    </>
+                  {review.verdict === "pass" ? (
+                    <CheckCircle className="h-4 w-4 text-primary" />
                   ) : (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      <span className="text-muted-foreground">审查中…</span>
-                    </>
+                    <XCircle className="h-4 w-4 text-destructive" />
                   )}
+                  <span className="font-medium">
+                    {review.verdict === "pass" ? "审查通过" : "审查未通过"}
+                  </span>
                 </div>
-
-                <div className="text-xs text-muted-foreground">
-                  批次{" "}
-                  <code className="rounded bg-muted px-1">{batch.batchId}</code>
-                  {" · "}
-                  来源{" "}
-                  <code className="rounded bg-muted px-1 break-all">
-                    {batch.sourceUrl}
-                  </code>
-                </div>
-
-                {review?.summary && (
-                  <p className="text-sm">{review.summary}</p>
+                {review.summary && (
+                  <p className="text-sm text-muted-foreground">
+                    {review.summary}
+                  </p>
                 )}
-
-                {batch.candidates.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-xs font-medium">
-                      包含 {batch.candidates.length} 个 Skill
-                    </span>
-                    {batch.candidates.map((c) => (
-                      <div
-                        key={c.name}
-                        className="flex items-baseline gap-2 text-sm"
-                      >
-                        <span className="font-medium">{c.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          v{c.version}
-                        </span>
-                        <span className="truncate text-xs text-muted-foreground">
-                          — {c.description}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 {rejected && review.issues?.length > 0 && (
-                  <div className="max-h-48 space-y-1 overflow-auto">
+                  <div className="max-h-40 space-y-1 overflow-auto">
                     {review.issues.map((issue, i) => (
                       <div
                         key={i}
@@ -418,91 +405,8 @@ export function InstallSkillDialog({
                   </div>
                 )}
               </>
-            ) : (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                暂无审查结果
-              </p>
             )}
-          </div>
-        )}
-
-        {step === 3 && batch && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <CheckCircle className="h-4 w-4 text-primary" />
-              <span className="font-medium">审查通过，选择要安装的 Skill</span>
-            </div>
-            {review?.summary && (
-              <p className="text-sm text-muted-foreground">{review.summary}</p>
-            )}
-            <div className="max-h-56 space-y-2 overflow-auto rounded-md border p-3">
-              {batch.candidates.map((c) => (
-                <label
-                  key={c.name}
-                  className="flex cursor-pointer items-start gap-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(c.name)}
-                    onChange={() => toggleCandidate(c.name)}
-                    className="mt-0.5 h-3.5 w-3.5 accent-primary"
-                    disabled={busy}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="font-medium">{c.name}</span>
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      v{c.version}
-                    </span>
-                    {c.description && (
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {c.description}
-                      </span>
-                    )}
-                  </span>
-                </label>
-              ))}
-              {batch.candidates.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  此批次没有可安装的 Skill
-                </p>
-              )}
-            </div>
-            {(overwrite || mode === "update") && (
-              <p className="text-xs text-muted-foreground">
-                更新模式将覆盖同名已安装 Skill。
-              </p>
-            )}
-          </div>
-        )}
-
-        <DialogFooter>
-          {step === 1 && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={busy}
-              >
-                取消
-              </Button>
-              <Button
-                onClick={() => void startInstall()}
-                disabled={busy || !url.trim()}
-              >
-                {busy ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    处理中…
-                  </>
-                ) : (
-                  "下一步"
-                )}
-              </Button>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
+            <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => void discardAndClose()}
@@ -510,23 +414,14 @@ export function InstallSkillDialog({
               >
                 放弃
               </Button>
-              {rejected && (
+              {canReReview && (
                 <Button
                   variant="outline"
                   onClick={() => void reReview()}
-                  disabled={busy || !batchId}
+                  disabled={busy}
                 >
-                  {busy ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      审查中…
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      重新审查
-                    </>
-                  )}
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  重新审查
                 </Button>
               )}
               {review?.verdict === "pass" && (
@@ -534,11 +429,46 @@ export function InstallSkillDialog({
                   继续安装
                 </Button>
               )}
-            </>
-          )}
+            </DialogFooter>
+          </div>
+        )}
 
-          {step === 3 && (
-            <>
+        {step === 3 && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              选择要安装的 Skill（默认全选）
+            </p>
+            <div className="max-h-48 space-y-2 overflow-auto">
+              {(batch?.candidates ?? []).map((c) => (
+                <label
+                  key={c.name}
+                  className="flex items-start gap-2 rounded-md border p-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 accent-primary"
+                    checked={selected.has(c.name)}
+                    disabled={busy}
+                    onChange={() => toggleCandidate(c.name)}
+                  />
+                  <span>
+                    <span className="font-medium">{c.name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      v{c.version}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {c.description}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {mode === "update" && (
+              <p className="text-xs text-muted-foreground">
+                将覆盖同名已安装 Skill，并尽量保留启用状态
+              </p>
+            )}
+            <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => void discardAndClose()}
@@ -552,17 +482,46 @@ export function InstallSkillDialog({
               >
                 {busy ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    安装中…
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    安装中...
                   </>
                 ) : (
                   `安装选中（${selected.size}）`
                 )}
               </Button>
-            </>
-          )}
-        </DialogFooter>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function InstallSkillDialog({
+  open,
+  onOpenChange,
+  onInstalled,
+  mode = "create",
+  initialUrl = "",
+  overwrite = false,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onInstalled: () => void;
+  mode?: "create" | "update";
+  initialUrl?: string;
+  overwrite?: boolean;
+}) {
+  if (!open) return null;
+  // key 保证每次打开 / 切换 URL 时状态全新，无需 effect 重置
+  return (
+    <InstallSkillDialogBody
+      key={`${mode}::${initialUrl}`}
+      onOpenChange={onOpenChange}
+      onInstalled={onInstalled}
+      mode={mode}
+      initialUrl={initialUrl}
+      overwrite={overwrite}
+    />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,36 +10,38 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { AGENT_KEYS } from "@/mastra/agent-meta";
 
-export function MountSkillDialog({
-  open,
-  onOpenChange,
+function MountSkillDialogBody({
   skillName,
   mounts,
+  onOpenChange,
   onSave,
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
   skillName: string;
   mounts: Record<string, string[]>;
+  onOpenChange: (v: boolean) => void;
   onSave: (next: Record<string, string[]>) => Promise<void>;
 }) {
-  const agentKeys = Object.keys(mounts);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  const agentKeys = useMemo(() => {
+    const keys = new Set<string>([...AGENT_KEYS, ...Object.keys(mounts)]);
+    return Array.from(keys);
+  }, [mounts]);
 
-  useEffect(() => {
-    if (!open) return;
-    const init = new Set(
-      agentKeys.filter((ak) => (mounts[ak] ?? []).includes(skillName))
-    );
-    setSelected(init);
-  }, [open, skillName, mounts]); // mounts 引用变化时重置
+  const [selected, setSelected] = useState(
+    () =>
+      new Set(
+        agentKeys.filter((ak) => (mounts[ak] ?? []).includes(skillName)),
+      ),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function confirm() {
     setBusy(true);
+    setError("");
     try {
-      const next = { ...mounts };
+      const next: Record<string, string[]> = { ...mounts };
       for (const ak of agentKeys) {
         const set = new Set(next[ak] ?? []);
         if (selected.has(ak)) set.add(skillName);
@@ -48,18 +50,27 @@ export function MountSkillDialog({
       }
       await onSave(next);
       onOpenChange(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "保存失败");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && busy) return;
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent showCloseButton={!busy}>
         <DialogHeader>
           <DialogTitle>挂载到 Agent</DialogTitle>
           <DialogDescription>
-            选择要挂载 Skill「{skillName}」的 Agent（仍需在表格中启用该 Skill 才会注入）
+            选择要挂载 Skill「{skillName}」的 Agent（仍需在表格中启用该 Skill
+            才会注入）
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 py-2">
@@ -72,6 +83,7 @@ export function MountSkillDialog({
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-primary"
                   checked={selected.has(ak)}
+                  disabled={busy}
                   onChange={() => {
                     setSelected((prev) => {
                       const n = new Set(prev);
@@ -86,15 +98,51 @@ export function MountSkillDialog({
             ))
           )}
         </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+          >
             取消
           </Button>
-          <Button onClick={confirm} disabled={busy}>
+          <Button
+            disabled={busy}
+            onClick={() => {
+              void confirm();
+            }}
+          >
             {busy ? "保存中..." : "保存"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function MountSkillDialog({
+  open,
+  onOpenChange,
+  skillName,
+  mounts,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  skillName: string;
+  mounts: Record<string, string[]>;
+  onSave: (next: Record<string, string[]>) => Promise<void>;
+}) {
+  if (!open) return null;
+  // key 在打开时重置勾选状态
+  return (
+    <MountSkillDialogBody
+      key={skillName}
+      skillName={skillName}
+      mounts={mounts}
+      onOpenChange={onOpenChange}
+      onSave={onSave}
+    />
   );
 }
