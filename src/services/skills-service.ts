@@ -5,8 +5,6 @@ import path from "node:path";
 import { getSetting, setSetting } from "@/services/settings-service";
 import { dataPath } from "@/lib/data-root";
 
-const SKILLS_DIR = dataPath("skills");
-const STAGING_DIR = dataPath("skills-staging");
 const MOUNTS_KEY = "skills_agent_mounts";
 
 export interface SkillMeta {
@@ -17,6 +15,9 @@ export interface SkillMeta {
   installedAt: string; // ISO
   enabled: boolean;
   contentHash: string;
+  license: string | null;
+  commit: string | null;
+  commitShort: string | null;
 }
 
 export interface ReviewIssue {
@@ -35,7 +36,7 @@ export interface SkillReviewResult {
 }
 
 export interface StagingFile {
-  path: string;       // 相对于 batch 根目录的路径
+  path: string; // 相对于 batch 根目录的路径
   content: string | null; // null = 二进制文件，跳过内容审查
 }
 
@@ -54,15 +55,26 @@ export interface StagingBatch {
   review: SkillReviewResult;
 }
 
+/** 每次调用 dataPath，禁止模块顶层冻结路径 */
+function skillsRoot(): string {
+  return dataPath("skills");
+}
+
+function stagingRoot(): string {
+  return dataPath("skills-staging");
+}
+
 function ensureSkillsDir(): void {
-  if (!fs.existsSync(SKILLS_DIR)) {
-    fs.mkdirSync(SKILLS_DIR, { recursive: true });
+  const dir = skillsRoot();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
 function ensureStagingDir(): void {
-  if (!fs.existsSync(STAGING_DIR)) {
-    fs.mkdirSync(STAGING_DIR, { recursive: true });
+  const dir = stagingRoot();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -96,8 +108,9 @@ function validateSkillName(name: string): void {
 
 function skillDir(name: string): string {
   validateSkillName(name);
-  const dir = path.resolve(SKILLS_DIR, name);
-  if (!dir.startsWith(path.resolve(SKILLS_DIR) + path.sep) && dir !== path.resolve(SKILLS_DIR)) {
+  const root = skillsRoot();
+  const dir = path.resolve(root, name);
+  if (!dir.startsWith(path.resolve(root) + path.sep) && dir !== path.resolve(root)) {
     throw new Error(`Skill 路径超出范围: "${name}"`);
   }
   return dir;
@@ -105,8 +118,9 @@ function skillDir(name: string): string {
 
 function stagingDir(batchId: string): string {
   validateSkillName(batchId);
-  const dir = path.resolve(STAGING_DIR, batchId);
-  if (!dir.startsWith(path.resolve(STAGING_DIR) + path.sep) && dir !== path.resolve(STAGING_DIR)) {
+  const root = stagingRoot();
+  const dir = path.resolve(root, batchId);
+  if (!dir.startsWith(path.resolve(root) + path.sep) && dir !== path.resolve(root)) {
     throw new Error(`Staging 路径超出范围: "${batchId}"`);
   }
   return dir;
@@ -120,16 +134,132 @@ function candidateDir(batchId: string, name: string): string {
   return path.join(stagingDir(batchId), "skills", name);
 }
 
+export function detectLicense(text: string): string | null {
+  const t = text.slice(0, 2000);
+  if (/MIT License/i.test(t) || (/^\s*MIT\b/m.test(t) && /Permission is hereby granted/i.test(t)))
+    return "MIT";
+  if (/Apache License/i.test(t) && /Version 2\.0/i.test(t)) return "Apache-2.0";
+  if (
+    (/BSD 3-Clause/i.test(t) || /Redistribution and use in source and binary forms/i.test(t)) &&
+    /3-clause/i.test(t)
+  )
+    return "BSD-3-Clause";
+  if (/BSD 2-Clause/i.test(t)) return "BSD-2-Clause";
+  if (/\bISC License\b/i.test(t)) return "ISC";
+  if (
+    /This is free and unencumbered software released into the public domain/i.test(t) ||
+    /\bUnlicense\b/i.test(t)
+  )
+    return "Unlicense";
+  if (/CC0 1\.0/i.test(t) || /Creative Commons Zero/i.test(t)) return "CC0";
+  return null;
+}
+
+function normalizeMeta(raw: Partial<SkillMeta> & { name: string }): SkillMeta {
+  return {
+    name: raw.name,
+    description: raw.description ?? "",
+    version: raw.version ?? "0.0.0",
+    sourceUrl: raw.sourceUrl ?? "",
+    installedAt: raw.installedAt ?? new Date().toISOString(),
+    enabled: raw.enabled ?? false,
+    contentHash: raw.contentHash ?? "",
+    license: raw.license ?? null,
+    commit: raw.commit ?? null,
+    commitShort: raw.commitShort ?? null,
+  };
+}
+
+function finalizeSkillDir(
+  dest: string,
+  opts: {
+    sourceUrl: string;
+    license?: string | null;
+    commit?: string | null;
+    commitShort?: string | null;
+    wasEnabled?: boolean;
+  },
+): void {
+  const candidatePath = path.join(dest, ".candidate.json");
+  const metaPath = path.join(dest, ".meta.json");
+  let raw: Partial<SkillMeta> & { name?: string } = {};
+
+  if (fs.existsSync(candidatePath)) {
+    try {
+      raw = JSON.parse(fs.readFileSync(candidatePath, "utf-8"));
+    } catch {
+      raw = {};
+    }
+  } else if (fs.existsSync(metaPath)) {
+    try {
+      raw = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    } catch {
+      raw = {};
+    }
+  }
+
+  const name = raw.name ?? path.basename(dest);
+  const meta = normalizeMeta({
+    ...raw,
+    name,
+    sourceUrl: raw.sourceUrl || opts.sourceUrl || "",
+    license: opts.license !== undefined ? opts.license : (raw.license ?? null),
+    commit: opts.commit !== undefined ? opts.commit : (raw.commit ?? null),
+    commitShort: opts.commitShort !== undefined ? opts.commitShort : (raw.commitShort ?? null),
+  });
+
+  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+  if (fs.existsSync(candidatePath)) {
+    fs.unlinkSync(candidatePath);
+  }
+  if (opts.wasEnabled) {
+    fs.writeFileSync(path.join(dest, ".enabled"), "", "utf-8");
+  }
+}
+
+function findLicenseFile(dir: string): string | null {
+  if (!fs.existsSync(dir)) return null;
+  for (const entry of fs.readdirSync(dir)) {
+    if (/^LICENSE(\..+)?$/i.test(entry) || /^LICENCE(\..+)?$/i.test(entry)) {
+      return path.join(dir, entry);
+    }
+  }
+  return null;
+}
+
+function readBatchLicense(batchDir: string): { text: string | null; filePath: string | null } {
+  const filePath = findLicenseFile(batchDir);
+  if (!filePath) return { text: null, filePath: null };
+  try {
+    return { text: fs.readFileSync(filePath, "utf-8"), filePath };
+  } catch {
+    return { text: null, filePath: null };
+  }
+}
+
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   const match = url.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
   if (!match) return null;
   return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
 }
 
-interface GitHubRepo { default_branch: string }
-interface GitHubTreeEntry { path: string; type: string }
-interface GitHubTree { tree: GitHubTreeEntry[] }
-interface GitHubContent { content: string; encoding: string }
+interface GitHubRepo {
+  default_branch: string;
+}
+interface GitHubTreeEntry {
+  path: string;
+  type: string;
+}
+interface GitHubTree {
+  tree: GitHubTreeEntry[];
+}
+interface GitHubContent {
+  content: string;
+  encoding: string;
+}
+interface GitHubCommit {
+  sha: string;
+}
 
 // GitHub API request
 async function githubApi(pathStr: string): Promise<any> {
@@ -173,6 +303,35 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
     throw new Error("SKILL.md 缺少必填字段 name/description");
   }
 
+  // optional commit + license for type consistency
+  let commit: string | null = null;
+  let commitShort: string | null = null;
+  try {
+    const head: GitHubCommit = await githubApi(`/repos/${owner}/${repo}/commits/${defaultBranch}`);
+    commit = head.sha ?? null;
+    commitShort = commit ? commit.slice(0, 7) : null;
+  } catch {
+    // ignore — legacy path may still install without commit
+  }
+
+  let license: string | null = null;
+  const licenseEntry = tree.tree.find(
+    (e: { path: string; type: string }) =>
+      e.type === "blob" && (/^LICENSE(\..+)?$/i.test(e.path) || /^LICENCE(\..+)?$/i.test(e.path)),
+  );
+  if (licenseEntry) {
+    try {
+      const licContent = await githubApi(
+        `/repos/${owner}/${repo}/contents/${licenseEntry.path}?ref=${defaultBranch}`,
+      );
+      if (typeof licContent.content === "string") {
+        license = detectLicense(Buffer.from(licContent.content, "base64").toString("utf-8"));
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // 5. Write to data/skills/<name>/
   const installDir = skillDir(front.name);
   ensureSkillsDir();
@@ -191,6 +350,9 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
     installedAt: new Date().toISOString(),
     enabled: false, // default disabled
     contentHash: simpleHash(skillMd),
+    license,
+    commit,
+    commitShort,
   };
   fs.writeFileSync(path.join(installDir, ".meta.json"), JSON.stringify(meta, null, 2), "utf-8");
 
@@ -213,14 +375,24 @@ export async function installFromUrl(url: string): Promise<{ name: string; versi
 /** List all installed skills. Skips directories missing .meta.json or SKILL.md. */
 export function listSkills(): SkillMeta[] {
   ensureSkillsDir();
+  const root = skillsRoot();
   const result: SkillMeta[] = [];
-  for (const entry of fs.readdirSync(SKILLS_DIR, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const metaPath = path.join(SKILLS_DIR, entry.name, ".meta.json");
-    const skillMdPath = path.join(SKILLS_DIR, entry.name, "SKILL.md");
+    const dir = path.join(root, entry.name);
+    const metaPath = path.join(dir, ".meta.json");
+    const skillMdPath = path.join(dir, "SKILL.md");
+    const candidatePath = path.join(dir, ".candidate.json");
+
+    // 幽灵目录：仅有 .candidate.json → 迁移为 .meta.json
+    if (!fs.existsSync(metaPath) && fs.existsSync(candidatePath) && fs.existsSync(skillMdPath)) {
+      finalizeSkillDir(dir, { sourceUrl: "" });
+    }
+
     if (!fs.existsSync(metaPath) || !fs.existsSync(skillMdPath)) continue;
     try {
-      const meta: SkillMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      const raw = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      const meta = normalizeMeta({ ...raw, name: raw.name ?? entry.name });
       meta.enabled = fs.existsSync(enabledFlagPath(entry.name));
       result.push(meta);
     } catch {
@@ -236,9 +408,16 @@ export function getSkill(name: string): (SkillMeta & { content: string }) | null
   const dir = skillDir(name);
   const metaPath = path.join(dir, ".meta.json");
   const skillMdPath = path.join(dir, "SKILL.md");
+  const candidatePath = path.join(dir, ".candidate.json");
+
+  if (!fs.existsSync(metaPath) && fs.existsSync(candidatePath) && fs.existsSync(skillMdPath)) {
+    finalizeSkillDir(dir, { sourceUrl: "" });
+  }
+
   if (!fs.existsSync(metaPath) || !fs.existsSync(skillMdPath)) return null;
   try {
-    const meta: SkillMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    const raw = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    const meta = normalizeMeta({ ...raw, name: raw.name ?? name });
     meta.enabled = fs.existsSync(enabledFlagPath(name));
     const content = fs.readFileSync(skillMdPath, "utf-8");
     return { ...meta, content };
@@ -302,7 +481,10 @@ export async function checkUpdate(name: string): Promise<{
 // ----------------------------------------------------------------
 
 /** Install skills from a GitHub repo to staging. Scans root and skills/ dir for SKILL.md files. */
-export async function installToStaging(url: string): Promise<StagingBatch> {
+export async function installToStaging(
+  url: string,
+  opts: { force?: boolean } = {},
+): Promise<StagingBatch> {
   const parsed = parseGitHubUrl(url);
   if (!parsed) {
     throw new Error("仅支持 public GitHub 仓库 URL（github.com/<owner>/<repo> 格式）");
@@ -311,6 +493,17 @@ export async function installToStaging(url: string): Promise<StagingBatch> {
 
   const repoMeta = await githubApi(`/repos/${owner}/${repo}`);
   const defaultBranch = repoMeta.default_branch;
+
+  // HEAD commit
+  let commit: string | null = null;
+  let commitShort: string | null = null;
+  try {
+    const head: GitHubCommit = await githubApi(`/repos/${owner}/${repo}/commits/${defaultBranch}`);
+    commit = head.sha ?? null;
+    commitShort = commit ? commit.slice(0, 7) : null;
+  } catch {
+    // optional enrichment
+  }
 
   const tree = await githubApi(`/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
 
@@ -337,7 +530,11 @@ export async function installToStaging(url: string): Promise<StagingBatch> {
   const batchDir = stagingDir(batchId);
   ensureStagingDir();
   if (fs.existsSync(batchDir)) {
-    throw new Error(`仓库 "${batchId}" 已在暂存区，请先处理`);
+    if (opts.force) {
+      discardStaging(batchId);
+    } else {
+      throw new Error(`仓库 "${batchId}" 已在暂存区，请先处理`);
+    }
   }
   fs.mkdirSync(batchDir, { recursive: true });
 
@@ -357,7 +554,7 @@ export async function installToStaging(url: string): Promise<StagingBatch> {
     const dir = candidateDir(batchId, front.name!);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "SKILL.md"), md, "utf-8");
-    // candidate 元数据
+    // candidate 元数据（license 在共享文件下载后再补；先写 commit）
     const candidateMeta: SkillMeta = {
       name: front.name!,
       description: front.description!,
@@ -366,6 +563,9 @@ export async function installToStaging(url: string): Promise<StagingBatch> {
       installedAt: new Date().toISOString(),
       enabled: false,
       contentHash: simpleHash(md),
+      license: null,
+      commit,
+      commitShort,
     };
     fs.writeFileSync(path.join(dir, ".candidate.json"), JSON.stringify(candidateMeta, null, 2), "utf-8");
     candidates.push({
@@ -407,6 +607,23 @@ export async function installToStaging(url: string): Promise<StagingBatch> {
     fs.writeFileSync(destPath, Buffer.from(content.content, "base64").toString("utf-8"), "utf-8");
   }
 
+  // 解析 LICENSE 并回写每个 candidate
+  const { text: licenseText } = readBatchLicense(batchDir);
+  const license = licenseText ? detectLicense(licenseText) : null;
+  if (license) {
+    for (const c of candidates) {
+      const cPath = path.join(candidateDir(batchId, c.name), ".candidate.json");
+      if (!fs.existsSync(cPath)) continue;
+      try {
+        const raw = JSON.parse(fs.readFileSync(cPath, "utf-8"));
+        raw.license = license;
+        fs.writeFileSync(cPath, JSON.stringify(raw, null, 2), "utf-8");
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   // 批次元数据
   const batch: StagingBatch = {
     batchId,
@@ -423,8 +640,9 @@ export async function installToStaging(url: string): Promise<StagingBatch> {
 /** List all staging batches with their review status. */
 export function listStaging(): StagingBatch[] {
   ensureStagingDir();
+  const root = stagingRoot();
   const result: StagingBatch[] = [];
-  for (const entry of fs.readdirSync(STAGING_DIR, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const bp = batchPath(entry.name);
     if (!fs.existsSync(bp)) continue;
@@ -460,9 +678,25 @@ export function getStagingFiles(batchId: string): StagingFile[] {
 function getStagingFilesFromDir(dir: string): StagingFile[] {
   const results: StagingFile[] = [];
   const textExtensions = new Set([
-    ".md", ".txt", ".json", ".yaml", ".yml", ".toml",
-    ".js", ".ts", ".mjs", ".cjs", ".py", ".sh", ".bash",
-    ".css", ".html", ".xml", ".svg", ".csv", ".env.example",
+    ".md",
+    ".txt",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".js",
+    ".ts",
+    ".mjs",
+    ".cjs",
+    ".py",
+    ".sh",
+    ".bash",
+    ".css",
+    ".html",
+    ".xml",
+    ".svg",
+    ".csv",
+    ".env.example",
   ]);
   const textBasenames = new Set(["LICENSE", "Makefile", "Dockerfile", ".gitignore", ".env.example"]);
 
@@ -505,7 +739,12 @@ function isUtf8File(buf: Buffer): boolean {
 }
 
 /** Publish selected candidates from a batch to permanent skills directory. Requires review verdict=pass. */
-export function publishCandidates(batchId: string, names: string[]): string[] {
+export function publishCandidates(
+  batchId: string,
+  names: string[],
+  opts: { overwrite?: boolean } = {},
+): { published: string[]; errors: string[] } {
+  const overwrite = opts.overwrite === true;
   const bp = batchPath(batchId);
   if (!fs.existsSync(bp)) throw new Error(`Staging 中未找到 "${batchId}"`);
   const batch: StagingBatch = JSON.parse(fs.readFileSync(bp, "utf-8"));
@@ -517,6 +756,10 @@ export function publishCandidates(batchId: string, names: string[]): string[] {
   const errors: string[] = [];
   ensureSkillsDir();
 
+  const batchDir = stagingDir(batchId);
+  const { text: licenseText, filePath: licenseFile } = readBatchLicense(batchDir);
+  const batchLicense = licenseText ? detectLicense(licenseText) : null;
+
   for (const name of names) {
     const candidate = batch.candidates.find((c) => c.name === name);
     if (!candidate) {
@@ -524,12 +767,61 @@ export function publishCandidates(batchId: string, names: string[]): string[] {
       continue;
     }
     const src = candidateDir(batchId, name);
-    const dest = skillDir(name);
-    if (fs.existsSync(dest)) {
-      errors.push(`Skill "${name}" 已存在`);
+    if (!fs.existsSync(src)) {
+      errors.push(`候选 "${name}" 目录不存在`);
       continue;
     }
+    const dest = skillDir(name);
+    let wasEnabled = false;
+
+    if (fs.existsSync(dest)) {
+      if (!overwrite) {
+        errors.push(`Skill "${name}" 已存在`);
+        continue;
+      }
+      wasEnabled = fs.existsSync(path.join(dest, ".enabled"));
+      fs.rmSync(dest, { recursive: true, force: true });
+    }
+
     fs.renameSync(src, dest);
+
+    // 复制 batch 根 LICENSE* 到 skill 目录
+    if (licenseFile) {
+      const base = path.basename(licenseFile);
+      const destLic = path.join(dest, base);
+      if (!fs.existsSync(destLic)) {
+        try {
+          fs.copyFileSync(licenseFile, destLic);
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // 从 candidate 读 commit/license，再与 batch 级 license 合并
+    let candLicense: string | null | undefined;
+    let candCommit: string | null | undefined;
+    let candCommitShort: string | null | undefined;
+    const candMetaPath = path.join(dest, ".candidate.json");
+    if (fs.existsSync(candMetaPath)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(candMetaPath, "utf-8"));
+        candLicense = raw.license ?? null;
+        candCommit = raw.commit ?? null;
+        candCommitShort = raw.commitShort ?? null;
+      } catch {
+        // ignore
+      }
+    }
+
+    finalizeSkillDir(dest, {
+      sourceUrl: batch.sourceUrl,
+      license: candLicense ?? batchLicense,
+      commit: candCommit ?? null,
+      commitShort: candCommitShort ?? null,
+      wasEnabled,
+    });
+
     published.push(name);
   }
 
@@ -543,10 +835,8 @@ export function publishCandidates(batchId: string, names: string[]): string[] {
     fs.writeFileSync(bp, JSON.stringify(batch, null, 2), "utf-8");
   }
 
-  if (errors.length > 0) {
-    throw new Error(errors.join("; "));
-  }
-  return published;
+  // 不再因 errors 而 throw；由调用方看 published/errors
+  return { published, errors };
 }
 
 /** Discard a staging batch entirely. */
@@ -602,5 +892,5 @@ export async function getEnabledSkillPaths(agentKey: string): Promise<string[]> 
       const skill = all.find((s) => s.name === name);
       return skill && skill.enabled;
     })
-    .map((name) => path.join(SKILLS_DIR, name));
+    .map((name) => path.join(skillsRoot(), name));
 }
