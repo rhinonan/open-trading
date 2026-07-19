@@ -9,12 +9,21 @@ import type { WorkWithBlogger, WorksResponse } from "@/types";
 interface WorksTableProps {
   bloggerSlug: string | null;
   onOpenDrawer: (work: WorkWithBlogger) => void;
+  onMessage: (text: string, type: "success" | "error") => void;
 }
 
-export function WorksTable({ bloggerSlug, onOpenDrawer }: WorksTableProps) {
+type ActionKind = "transcribe" | "summarize" | "evaluate";
+
+export function WorksTable({ bloggerSlug, onOpenDrawer, onMessage }: WorksTableProps) {
   const [data, setData] = useState<WorksResponse | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
+
+  const setActionLoading = (workId: number, action: ActionKind, v: boolean) => {
+    const key = `${workId}:${action}`;
+    setLoadingActions((prev) => (prev[key] === v ? prev : { ...prev, [key]: v }));
+  };
 
   const fetchWorks = useCallback(
     async (p: number) => {
@@ -62,20 +71,39 @@ export function WorksTable({ bloggerSlug, onOpenDrawer }: WorksTableProps) {
 
   // ── Action handlers ──────────────────────────────────────
 
-  const handleTranscribe = async (work: WorkWithBlogger) => {
-    await fetch(`/api/douyin/works/${work.id}/transcribe`, { method: "POST" });
+  const action = async (work: WorkWithBlogger, kind: ActionKind, endpoint: string) => {
+    setActionLoading(work.id, kind, true);
+    try {
+      const res = await fetch(endpoint, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const labels: Record<ActionKind, string> = {
+          transcribe: "转写",
+          summarize: "观点提取",
+          evaluate: "评判",
+        };
+        onMessage(
+          `「${labels[kind]}」已入队 — `,
+          "success"
+        );
+      } else {
+        onMessage(body.error || `请求失败 (${res.status})`, "error");
+      }
+    } catch {
+      onMessage("网络请求失败", "error");
+    }
+    setActionLoading(work.id, kind, false);
     fetchWorks(page);
   };
 
-  const handleSummarize = async (work: WorkWithBlogger) => {
-    await fetch(`/api/douyin/works/${work.id}/summarize`, { method: "POST" });
-    fetchWorks(page);
-  };
+  const handleTranscribe = (work: WorkWithBlogger) =>
+    action(work, "transcribe", `/api/douyin/works/${work.id}/transcribe`);
 
-  const handleEvaluate = async (work: WorkWithBlogger) => {
-    await fetch(`/api/douyin/works/${work.id}/evaluate`, { method: "POST" });
-    fetchWorks(page);
-  };
+  const handleSummarize = (work: WorkWithBlogger) =>
+    action(work, "summarize", `/api/douyin/works/${work.id}/summarize`);
+
+  const handleEvaluate = (work: WorkWithBlogger) =>
+    action(work, "evaluate", `/api/douyin/works/${work.id}/evaluate`);
 
   // ── Render ───────────────────────────────────────────────
 
@@ -125,6 +153,11 @@ export function WorksTable({ bloggerSlug, onOpenDrawer }: WorksTableProps) {
                   onTranscribe={() => handleTranscribe(w)}
                   onSummarize={() => handleSummarize(w)}
                   onEvaluate={() => handleEvaluate(w)}
+                  loading={{
+                    transcribe: !!loadingActions[`${w.id}:transcribe`],
+                    summarize: !!loadingActions[`${w.id}:summarize`],
+                    evaluate: !!loadingActions[`${w.id}:evaluate`],
+                  }}
                 />
               ))
             ) : (

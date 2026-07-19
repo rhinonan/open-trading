@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Radio } from "lucide-react";
+import { Radio, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BloggerSidebar } from "./BloggerSidebar";
 import { WorksTable } from "./WorksTable";
@@ -15,7 +15,13 @@ export default function DouyinSettingsPage() {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [drawerWork, setDrawerWork] = useState<WorkWithBlogger | null>(null);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const showMessage = useCallback((text: string, type: "success" | "error") => {
+    setMessage(text);
+    setMessageType(type);
+  }, []);
 
   // ── Fetch bloggers ──────────────────────────────────────
 
@@ -37,19 +43,19 @@ export default function DouyinSettingsPage() {
   // ── Blogger actions ─────────────────────────────────────
 
   const handleScan = async (blogger: DouyinBlogger) => {
-    setMessage("");
+    showMessage("", "success");
     try {
       const res = await fetch(`/api/douyin/bloggers/${blogger.slug}/scan`, {
         method: "POST",
       });
       if (res.ok) {
-        setMessage(`已扫描「${blogger.nickname}」`);
+        showMessage(`已扫描「${blogger.nickname}」`, "success");
       } else {
         const data = await res.json();
-        setMessage(`扫描失败: ${data.error || "未知错误"}`);
+        showMessage(`扫描失败: ${data.error || "未知错误"}`, "error");
       }
     } catch {
-      setMessage("扫描请求失败");
+      showMessage("扫描请求失败", "error");
     }
   };
 
@@ -60,14 +66,14 @@ export default function DouyinSettingsPage() {
         method: "DELETE",
       });
       if (res.ok) {
-        setMessage(`已删除「${blogger.nickname}」`);
+        showMessage(`已删除「${blogger.nickname}」`, "success");
         if (selectedSlug === blogger.slug) setSelectedSlug(null);
         fetchBloggers();
       } else {
-        setMessage("删除失败");
+        showMessage("删除失败", "error");
       }
     } catch {
-      setMessage("删除失败");
+      showMessage("删除失败", "error");
     }
   };
 
@@ -97,11 +103,28 @@ export default function DouyinSettingsPage() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Message banner */}
           {message && (
-            <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b text-sm shrink-0">
-              <span className="text-muted-foreground">{message}</span>
+            <div
+              className={`flex items-center justify-between px-4 py-2 border-b text-sm shrink-0 ${
+                messageType === "error"
+                  ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
+                  : "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                {message}
+                {messageType === "success" && (
+                  <a
+                    href="/settings/agents"
+                    target="_blank"
+                    className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
+                  >
+                    查看 Agent 日志 <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </span>
               <button
                 onClick={() => setMessage("")}
-                className="text-muted-foreground hover:text-foreground ml-2"
+                className="opacity-60 hover:opacity-100 ml-2 text-lg leading-none"
               >
                 ×
               </button>
@@ -111,6 +134,7 @@ export default function DouyinSettingsPage() {
           <WorksTable
             bloggerSlug={selectedSlug}
             onOpenDrawer={setDrawerWork}
+            onMessage={showMessage}
           />
         </div>
 

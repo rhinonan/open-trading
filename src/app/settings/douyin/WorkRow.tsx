@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { FileText, RefreshCw, Lightbulb, Scale } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { WorkWithBlogger } from "@/types";
 
 const TRANSCRIPT_STATUS: Record<
@@ -42,6 +43,11 @@ interface WorkRowProps {
   onTranscribe: () => void;
   onSummarize: () => void;
   onEvaluate: () => void;
+  loading?: {
+    transcribe?: boolean;
+    summarize?: boolean;
+    evaluate?: boolean;
+  };
 }
 
 export function WorkRow({
@@ -50,6 +56,7 @@ export function WorkRow({
   onTranscribe,
   onSummarize,
   onEvaluate,
+  loading = {},
 }: WorkRowProps) {
   const tStatus = TRANSCRIPT_STATUS[work.transcriptStatus] ?? {
     label: work.transcriptStatus,
@@ -197,14 +204,20 @@ export function WorkRow({
               }
               onClick={() => canTranscribe && onTranscribe()}
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              {loading.transcribe ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
             </TooltipTrigger>
             <TooltipContent>
-              {work.transcriptStatus === "processing"
-                ? "转写中…"
-                : canTranscribe
-                  ? "转写"
-                  : "无法转写"}
+              {loading.transcribe
+                ? "入队中…"
+                : work.transcriptStatus === "processing"
+                  ? "转写中…"
+                  : canTranscribe
+                    ? "转写"
+                    : "无法转写"}
             </TooltipContent>
           </Tooltip>
 
@@ -219,10 +232,14 @@ export function WorkRow({
               }
               onClick={() => canSummarize && onSummarize()}
             >
-              <Lightbulb className="h-3.5 w-3.5" />
+              {loading.summarize ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                <Lightbulb className="h-3.5 w-3.5" />
+              )}
             </TooltipTrigger>
             <TooltipContent>
-              {canSummarize ? "观点提取" : "无法提取"}
+              {loading.summarize ? "提取中…" : canSummarize ? "观点提取" : "无法提取"}
             </TooltipContent>
           </Tooltip>
 
@@ -237,10 +254,14 @@ export function WorkRow({
               }
               onClick={() => canEvaluate && onEvaluate()}
             >
-              <Scale className="h-3.5 w-3.5" />
+              {loading.evaluate ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                <Scale className="h-3.5 w-3.5" />
+              )}
             </TooltipTrigger>
             <TooltipContent>
-              {canEvaluate ? "评判" : "无法评判"}
+              {loading.evaluate ? "入队中…" : canEvaluate ? "评判" : "无法评判"}
             </TooltipContent>
           </Tooltip>
         </div>
