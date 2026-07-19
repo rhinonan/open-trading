@@ -65,9 +65,10 @@ export function WorkRow({
   const canTranscribe =
     work.transcriptStatus === "pending" || work.transcriptStatus === "failed";
   const canSummarize =
-    work.transcriptStatus === "done" && !work.opinionSummary;
+    work.transcriptStatus === "done" && !!work.transcript && !work.opinionSummary;
   const canEvaluate =
     work.transcriptStatus === "done" &&
+    !!work.transcript &&
     (evalStatusKey === "none" || evalStatusKey === "failed");
 
   const opinionText = work.opinionSummary || "";
