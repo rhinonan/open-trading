@@ -22,13 +22,15 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
 
   try {
-    const { url } = await req.json();
+    const { url, force } = await req.json();
     if (!url || typeof url !== "string" || !url.trim()) {
       return Response.json({ success: false, error: "请提供 GitHub 仓库 URL" }, { status: 400 });
     }
 
     // 1. 下载到 staging
-    const batch = await skillService.installToStaging(url.trim());
+    const batch = await skillService.installToStaging(url.trim(), {
+      force: force === true,
+    });
 
     // 2. 触发审查
     const run = await mastra.getWorkflow("skillReviewWorkflow").createRun();

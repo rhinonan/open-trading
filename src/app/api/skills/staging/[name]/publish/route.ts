@@ -12,12 +12,20 @@ export async function POST(
 
   try {
     const { name: batchId } = await ctx.params;
-    const { names } = await req.json();
+    const { names, overwrite } = await req.json();
     if (!names || !Array.isArray(names) || names.length === 0) {
       return Response.json({ success: false, error: "请提供要安装的 skill 名称列表" }, { status: 400 });
     }
-    const published = skillService.publishCandidates(batchId, names);
-    return Response.json({ success: true, published });
+    const result = skillService.publishCandidates(batchId, names, {
+      overwrite: overwrite === true,
+    });
+    if (result.published.length === 0 && result.errors.length > 0) {
+      return Response.json(
+        { success: false, error: result.errors.join("; "), ...result },
+        { status: 409 },
+      );
+    }
+    return Response.json({ success: true, ...result });
   } catch (err) {
     return Response.json(
       { success: false, error: err instanceof Error ? err.message : "发布失败" },
