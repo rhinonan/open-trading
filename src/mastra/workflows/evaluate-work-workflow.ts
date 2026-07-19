@@ -141,7 +141,11 @@ const judgeStep = createStep({
 
     const agent = await getRegisteredAgent("evaluatorAgent");
     const result = await agent.generate(prompt, {
-      structuredOutput: { schema: predictionsSchema },
+      // newapi 上部分模型不支持原生 response_format，改用 prompt 注入强制 JSON。
+      structuredOutput: {
+        schema: predictionsSchema,
+        jsonPromptInjection: true,
+      },
       maxSteps: 15,
       modelSettings: { temperature: 0.3 },
     });

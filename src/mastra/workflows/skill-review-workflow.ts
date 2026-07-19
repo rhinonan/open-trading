@@ -110,7 +110,12 @@ const reviewStep = createStep({
 
     const agent = await getRegisteredAgent("skillReviewerAgent");
     const result = await agent.generate(fullPrompt, {
-      structuredOutput: { schema: reviewOutputSchema },
+      // newapi 上部分模型（如 deepseek-v4-pro）不支持原生 response_format，
+      // 用 prompt 注入强制 JSON，避免 "This response_format type is unavailable now"。
+      structuredOutput: {
+        schema: reviewOutputSchema,
+        jsonPromptInjection: true,
+      },
       maxSteps: 10,
       modelSettings: { temperature: 0.1 },
     });

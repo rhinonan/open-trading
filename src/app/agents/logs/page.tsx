@@ -53,7 +53,10 @@ export default function AgentLogsPage() {
           if (!open) setSelectedTraceId(null);
         }}
       >
-        <SheetContent side="right" className="w-[min(90vw,880px)] sm:max-w-[880px] p-0">
+        <SheetContent
+          side="right"
+          className="w-[min(90vw,880px)] max-w-[min(90vw,880px)] p-0 data-[side=right]:w-[min(90vw,880px)] data-[side=right]:sm:max-w-[880px]"
+        >
           <SheetHeader className="px-4 py-3 border-b">
             <SheetTitle>
               {selectedLog?.entityName ?? "日志详情"}
