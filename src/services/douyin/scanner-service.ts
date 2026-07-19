@@ -1,7 +1,8 @@
 import { db } from "@/db";
-import { bloggers, works } from "@/db/schema";
+import { works } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { fetchUserPosts } from "@/lib/douyin-api";
+import { listEnabledBloggers } from "@/services/douyin/blogger-service";
 import type { DouyinBlogger } from "@/types";
 
 const CUTOFF_DATE = process.env.DOUYIN_SCAN_CUTOFF_DATE || "2026-06-01";
@@ -16,7 +17,7 @@ export interface ScanResult {
 }
 
 export async function scanAllBloggers(): Promise<ScanResult[]> {
-  const allBloggers = db.select().from(bloggers).all();
+  const allBloggers = await listEnabledBloggers();
 
   const results: ScanResult[] = [];
   for (const blogger of allBloggers) {
