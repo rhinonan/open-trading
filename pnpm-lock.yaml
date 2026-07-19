@@ -29,6 +29,9 @@ importers:
       '@mastra/libsql':
         specifier: ^1.16.0
         version: 1.16.0(@mastra/core@1.51.0(ai@7.0.31(zod@4.4.3))(express@5.2.1)(zod@4.4.3))
+      '@mastra/observability':
+        specifier: ^1.16.1
+        version: 1.16.1(@mastra/core@1.51.0(ai@7.0.31(zod@4.4.3))(express@5.2.1)(zod@4.4.3))(zod@4.4.3)
       '@streamdown/cjk':
         specifier: ^1.0.3
         version: 1.0.3(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(react@19.2.4)(unified@11.0.5)
@@ -1232,6 +1235,13 @@ packages:
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@mastra/core': '>=1.51.0-0 <2.0.0-0'
+
+  '@mastra/observability@1.16.1':
+    resolution: {integrity: sha512-Cz737iM3jI2wLd/idx1O5/Sxb8QrGpjrgHZuIWi5MxUJQ0/ptjAzw+yMlGHhwy+3F7LVPzUDL9P/l/EC9pixRg==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      '@mastra/core': '>=1.16.0-0 <2.0.0-0'
+      zod: ^3.25.0 || ^4.0.0
 
   '@mastra/schema-compat@1.3.4':
     resolution: {integrity: sha512-2ObUsd21KIVelQy+eKPxJvnMxtmKnWacsIkZovhEYjVcQX9OYTDQ+u4E4RboIJZvurJnFx++/ujQLFznUaEYMg==}
@@ -6404,6 +6414,11 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@mastra/observability@1.16.1(@mastra/core@1.51.0(ai@7.0.31(zod@4.4.3))(express@5.2.1)(zod@4.4.3))(zod@4.4.3)':
+    dependencies:
+      '@mastra/core': 1.51.0(ai@7.0.31(zod@4.4.3))(express@5.2.1)(zod@4.4.3)
+      zod: 4.4.3
 
   '@mastra/schema-compat@1.3.4(zod@4.4.3)':
     dependencies:
