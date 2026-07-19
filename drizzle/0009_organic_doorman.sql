@@ -1,0 +1,1 @@
+ALTER TABLE `bloggers` ADD `disabled` integer DEFAULT 0 NOT NULL;

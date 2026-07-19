@@ -15,6 +15,7 @@ export const bloggers = sqliteTable("bloggers", {
   updatedAt: integer("updated_at")
     .notNull()
     .default(sql`(unixepoch())`),
+  disabled: integer("disabled").notNull().default(0),
 });
 
 export const works = sqliteTable(
