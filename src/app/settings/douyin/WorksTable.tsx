@@ -6,15 +6,28 @@ import { Button } from "@/components/ui/button";
 import { WorkRow } from "./WorkRow";
 import type { WorkWithBlogger, WorksResponse } from "@/types";
 
+export type MessageOpts = { agentLog?: boolean };
+
 interface WorksTableProps {
   bloggerSlug: string | null;
   onOpenDrawer: (work: WorkWithBlogger) => void;
-  onMessage: (text: string, type: "success" | "error") => void;
+  onMessage: (
+    text: string,
+    type: "success" | "error",
+    opts?: MessageOpts
+  ) => void;
+  /** page 递增此值触发 fetchWorks(page) */
+  refreshKey?: number;
 }
 
 type ActionKind = "transcribe" | "summarize" | "evaluate";
 
-export function WorksTable({ bloggerSlug, onOpenDrawer, onMessage }: WorksTableProps) {
+export function WorksTable({
+  bloggerSlug,
+  onOpenDrawer,
+  onMessage,
+  refreshKey,
+}: WorksTableProps) {
   const [data, setData] = useState<WorksResponse | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -57,6 +70,12 @@ export function WorksTable({ bloggerSlug, onOpenDrawer, onMessage }: WorksTableP
     if (page > 0) fetchWorks(page);
   }, [page, fetchWorks]);
 
+  // External refresh (scan / bulk ops) — only when refreshKey bumps
+  useEffect(() => {
+    if (refreshKey == null || refreshKey === 0) return;
+    if (bloggerSlug) fetchWorks(page);
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: refreshKey trigger only
+
   // Poll while any work is processing
   useEffect(() => {
     if (!data) return;
@@ -82,10 +101,9 @@ export function WorksTable({ bloggerSlug, onOpenDrawer, onMessage }: WorksTableP
           summarize: "观点提取",
           evaluate: "评判",
         };
-        onMessage(
-          `「${labels[kind]}」已入队 — `,
-          "success"
-        );
+        onMessage(`「${labels[kind]}」已入队`, "success", {
+          agentLog: true,
+        });
       } else {
         onMessage(body.error || `请求失败 (${res.status})`, "error");
       }

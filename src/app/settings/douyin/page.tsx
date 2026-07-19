@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Radio, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BloggerSidebar } from "./BloggerSidebar";
 import { WorksTable } from "./WorksTable";
 import { WorkDrawer } from "./WorkDrawer";
 import { AddBloggerDialog } from "./AddBloggerDialog";
+import { OpsToolbar } from "./OpsToolbar";
+import { EvalStatusBar } from "./EvalStatusBar";
 import type { DouyinBlogger, WorkWithBlogger } from "@/types";
+
+type MessageOpts = { agentLog?: boolean };
 
 export default function DouyinSettingsPage() {
   const [bloggers, setBloggers] = useState<DouyinBlogger[]>([]);
@@ -16,12 +21,18 @@ export default function DouyinSettingsPage() {
   const [drawerWork, setDrawerWork] = useState<WorkWithBlogger | null>(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [messageAgentLog, setMessageAgentLog] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const showMessage = useCallback((text: string, type: "success" | "error") => {
-    setMessage(text);
-    setMessageType(type);
-  }, []);
+  const showMessage = useCallback(
+    (text: string, type: "success" | "error", opts?: MessageOpts) => {
+      setMessage(text);
+      setMessageType(type);
+      setMessageAgentLog(opts?.agentLog === true);
+    },
+    []
+  );
 
   // ── Fetch bloggers ──────────────────────────────────────
 
@@ -43,15 +54,21 @@ export default function DouyinSettingsPage() {
   // ── Blogger actions ─────────────────────────────────────
 
   const handleScan = async (blogger: DouyinBlogger) => {
-    showMessage("", "success");
+    showMessage("", "success", { agentLog: false });
     try {
       const res = await fetch(`/api/douyin/bloggers/${blogger.slug}/scan`, {
         method: "POST",
       });
-      if (res.ok) {
-        showMessage(`已扫描「${blogger.nickname}」`, "success");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success !== false) {
+        const newWorks = data.newWorks ?? 0;
+        showMessage(
+          `已扫描「${blogger.nickname}」：新增 ${newWorks} 条`,
+          "success",
+          { agentLog: false }
+        );
+        setRefreshKey((k) => k + 1);
       } else {
-        const data = await res.json();
         showMessage(`扫描失败: ${data.error || "未知错误"}`, "error");
       }
     } catch {
@@ -66,7 +83,9 @@ export default function DouyinSettingsPage() {
         method: "DELETE",
       });
       if (res.ok) {
-        showMessage(`已删除「${blogger.nickname}」`, "success");
+        showMessage(`已删除「${blogger.nickname}」`, "success", {
+          agentLog: false,
+        });
         if (selectedSlug === blogger.slug) setSelectedSlug(null);
         fetchBloggers();
       } else {
@@ -81,11 +100,27 @@ export default function DouyinSettingsPage() {
 
   return (
     <Card className="h-[calc(100vh-8rem)] flex flex-col">
-      <CardHeader className="shrink-0">
+      <CardHeader className="shrink-0 space-y-3">
         <CardTitle className="text-base font-medium flex items-center gap-2">
           <Radio className="h-4 w-4" />
           抖音雷达管理
+          <Link
+            href="/settings/schedule"
+            className="ml-auto text-xs font-normal text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            调度
+          </Link>
         </CardTitle>
+        <OpsToolbar
+          bloggers={bloggers}
+          onAdd={() => setAddDialogOpen(true)}
+          onMessage={showMessage}
+          onScanComplete={() => {
+            setRefreshKey((k) => k + 1);
+            fetchBloggers();
+          }}
+        />
+        <EvalStatusBar />
       </CardHeader>
       <CardContent className="flex-1 flex min-h-0 p-0">
         {/* Left: Blogger sidebar */}
@@ -112,7 +147,7 @@ export default function DouyinSettingsPage() {
             >
               <span className="flex items-center gap-2">
                 {message}
-                {messageType === "success" && (
+                {messageAgentLog && (
                   <a
                     href="/agents/logs"
                     target="_blank"
@@ -135,6 +170,7 @@ export default function DouyinSettingsPage() {
             bloggerSlug={selectedSlug}
             onOpenDrawer={setDrawerWork}
             onMessage={showMessage}
+            refreshKey={refreshKey}
           />
         </div>
 
