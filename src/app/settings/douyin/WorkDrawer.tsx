@@ -40,7 +40,7 @@ export function WorkDrawer({ work, onClose }: WorkDrawerProps) {
     setItemsLoading(true);
     fetch(`/api/douyin/records?workId=${work.id}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .then((data) => setItems(Array.isArray(data?.items) ? data.items : []))
       .catch(() => setItems([]))
       .finally(() => setItemsLoading(false));
   }, [work?.id, work]); // eslint-disable-line react-hooks/exhaustive-deps
