@@ -446,6 +446,19 @@ export function deleteSkill(name: string): void {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+/** 从所有 agent 的 skill mounts 中移除已删除的 skill 名称。 */
+export async function purgeSkillFromMounts(name: string): Promise<void> {
+  const mounts = await getAgentSkillMounts();
+  let changed = false;
+  const next: Record<string, string[]> = {};
+  for (const [agent, list] of Object.entries(mounts)) {
+    const filtered = list.filter((s) => s !== name);
+    if (filtered.length !== list.length) changed = true;
+    next[agent] = filtered;
+  }
+  if (changed) await setAgentSkillMounts(next);
+}
+
 /** Check upstream for a newer version of an installed skill. */
 export async function checkUpdate(name: string): Promise<{
   currentVersion: string;

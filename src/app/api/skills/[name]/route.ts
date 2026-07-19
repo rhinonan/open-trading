@@ -58,8 +58,9 @@ export async function DELETE(
       skillService.discardStaging(name);
       return Response.json({ success: true });
     }
-    // 否则删除正式 skill
+    // 否则删除正式 skill，并清理 agent mounts 中的引用
     skillService.deleteSkill(name);
+    await skillService.purgeSkillFromMounts(name);
     return Response.json({ success: true });
   } catch (err) {
     return Response.json(
