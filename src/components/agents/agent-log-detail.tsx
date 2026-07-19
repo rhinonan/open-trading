@@ -5,6 +5,7 @@ import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
+  ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import {
   Message,
@@ -12,6 +13,8 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import type { SpanDetail, LogItem } from "@/hooks/use-agent-logs";
+import { AGENT_KEY_BY_ID } from "@/mastra/agent-meta";
+import { parseSpanToReplayMessages } from "@/lib/agent-log-messages";
 
 interface AgentLogDetailProps {
   spans: SpanDetail[];
@@ -20,69 +23,13 @@ interface AgentLogDetailProps {
   log: LogItem | null;
 }
 
-/**
- * 从 span 的 input/output 中提取人类可读的文本。
- * input/output 可能直接是字符串，也可能是 MessagePack 解码后的对象。
- */
-function extractText(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return extractText(parsed);
-    } catch {
-      return value;
-    }
-  }
-  if (typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if (Array.isArray(obj.messages)) {
-      return (obj.messages as Array<Record<string, unknown>>)
-        .map((m) => {
-          const role = m.role === "user" ? "用户" : "助手";
-          const content =
-            typeof m.content === "string"
-              ? m.content
-              : JSON.stringify(m.content);
-          return `**${role}:** ${content}`;
-        })
-        .join("\n\n");
-    }
-    for (const key of ["text", "content", "prompt", "query", "input"]) {
-      if (typeof obj[key] === "string") return obj[key] as string;
-    }
-    return JSON.stringify(value, null, 2);
-  }
-  return String(value);
-}
-
-/** 找到 AGENT_RUN 类型根 span，提取对话信息 */
-function findConversationSpans(spans: SpanDetail[]) {
-  const rootSpan = spans.find(
-    (s) => s.spanType === "agent_run" && !s.parentSpanId
+function findRootSpan(spans: SpanDetail[]): SpanDetail | null {
+  return (
+    spans.find((s) => s.spanType === "agent_run" && !s.parentSpanId) ??
+    spans.find((s) => s.spanType === "agent_run") ??
+    spans[0] ??
+    null
   );
-  if (!rootSpan) {
-    // 兼容 workflow_run：直接用第一个 span
-    const first = spans[0];
-    if (!first) return null;
-    return {
-      userInput: extractText(first.input),
-      assistantOutput: extractText(first.output),
-      error: first.error,
-      entityName: first.entityName,
-      startedAt: first.startedAt,
-      endedAt: first.endedAt,
-    };
-  }
-
-  return {
-    userInput: extractText(rootSpan.input),
-    assistantOutput: extractText(rootSpan.output),
-    error: rootSpan.error,
-    entityName: rootSpan.entityName,
-    startedAt: rootSpan.startedAt,
-    endedAt: rootSpan.endedAt,
-  };
 }
 
 export function AgentLogDetail({
@@ -101,20 +48,32 @@ export function AgentLogDetail({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full py-16 text-red-500 text-sm">
+      <div className="flex items-center justify-center h-full py-16 text-danger text-sm">
         {error}
       </div>
     );
   }
 
-  const conv = findConversationSpans(spans);
+  const root = findRootSpan(spans);
+  const messages = root
+    ? parseSpanToReplayMessages(root.input, root.output)
+    : [];
+  const entityName = root
+    ? (AGENT_KEY_BY_ID[root.entityName] ??
+      (root.entityName || root.name))
+    : "";
+  const hasError = root?.error != null;
 
-  if (!conv || (!conv.userInput && !conv.assistantOutput)) {
+  if (!root || (messages.length === 0 && !hasError)) {
     return (
       <ConversationEmptyState
         icon={<Bot className="size-12" />}
         title="暂无对话内容"
-        description="该次调用没有记录到输入或输出"
+        description={
+          spans.length
+            ? `该 trace 含 ${spans.length} 个 span，但未解析到可回放消息`
+            : "该次调用没有记录到输入或输出"
+        }
       />
     );
   }
@@ -122,22 +81,23 @@ export function AgentLogDetail({
   return (
     <div className="flex flex-col h-full">
       {/* 元信息条 */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b text-xs text-muted-foreground bg-muted/30">
-        <span className="font-medium text-foreground">{conv.entityName}</span>
-        <span>
-          {new Date(conv.startedAt).toLocaleString("zh-CN")}
-        </span>
-        {conv.endedAt && (
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b text-xs text-muted-foreground bg-muted/30">
+        <span className="font-medium text-foreground">{entityName}</span>
+        {root.startedAt && (
+          <span>{new Date(root.startedAt).toLocaleString("zh-CN")}</span>
+        )}
+        {root.endedAt && root.startedAt && (
           <span>
             耗时{" "}
             {(
-              (new Date(conv.endedAt).getTime() -
-                new Date(conv.startedAt).getTime()) /
+              (new Date(root.endedAt).getTime() -
+                new Date(root.startedAt).getTime()) /
               1000
             ).toFixed(1)}
             s
           </span>
         )}
+        <span>{spans.length} spans</span>
         {log?.callSource && (
           <span className="bg-secondary px-1.5 py-0.5 rounded">
             {log.callSource === "chat"
@@ -149,47 +109,53 @@ export function AgentLogDetail({
         )}
       </div>
 
-      {!conv.endedAt && !conv.error && (
-        <div className="flex items-center gap-2 px-4 py-2 text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20 border-b">
+      {!root.endedAt && !hasError && (
+        <div className="flex items-center gap-2 px-4 py-2 text-xs text-warning bg-warning/10 border-b">
           <Clock className="h-3 w-3" />
           运行中…
         </div>
       )}
 
+      {/* 与 AgentChat 相同的 ai-elements 对话壳，只读 */}
       <Conversation className="flex-1 min-h-0">
         <ConversationContent className="px-4 py-4">
-          {conv.userInput && (
-            <Message from="user">
+          {messages.map((message) => (
+            <Message from={message.role} key={message.id}>
               <MessageContent>
-                <MessageResponse>{conv.userInput}</MessageResponse>
+                <MessageResponse>{message.text}</MessageResponse>
               </MessageContent>
             </Message>
-          )}
+          ))}
 
-          {conv.error ? (
+          {hasError ? (
             <Message from="assistant">
               <MessageContent>
-                <div className="flex items-start gap-2 text-red-500">
+                <div className="flex items-start gap-2 text-danger">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium text-sm">调用出错</p>
-                    <pre className="text-xs mt-1 whitespace-pre-wrap font-mono">
-                      {typeof conv.error === "string"
-                        ? conv.error
-                        : JSON.stringify(conv.error, null, 2)}
+                    <pre className="text-xs mt-1 whitespace-pre-wrap font-sans">
+                      {typeof root.error === "string"
+                        ? root.error
+                        : JSON.stringify(root.error, null, 2)}
                     </pre>
                   </div>
                 </div>
               </MessageContent>
             </Message>
-          ) : conv.assistantOutput ? (
+          ) : null}
+
+          {!hasError && messages.every((m) => m.role === "user") ? (
             <Message from="assistant">
               <MessageContent>
-                <MessageResponse>{conv.assistantOutput}</MessageResponse>
+                <span className="text-muted-foreground italic text-sm">
+                  无输出或仍在运行…
+                </span>
               </MessageContent>
             </Message>
           ) : null}
         </ConversationContent>
+        <ConversationScrollButton />
       </Conversation>
     </div>
   );
