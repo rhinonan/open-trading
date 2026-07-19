@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { label: "基础设置", href: "/settings" },
   { label: "抖音雷达", href: "/settings/douyin" },
+  { label: "调度", href: "/settings/schedule" },
   { label: "Skills", href: "/settings/skills" },
 ];
 
