@@ -30,6 +30,25 @@ export async function GET(
   return Response.json(blogger);
 }
 
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+  const { slug } = await ctx.params;
+  try {
+    const body = await req.json();
+    if (typeof body.disabled !== "boolean") {
+      return Response.json({ error: "disabled 必须为 boolean" }, { status: 400 });
+    }
+    const blogger = await bloggerService.setBloggerDisabled(slug, body.disabled);
+    return Response.json({ success: true, blogger });
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : "更新失败" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const denied = requireAdmin(req);
   if (denied) return denied;

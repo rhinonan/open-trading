@@ -10,9 +10,11 @@ export async function GET(request: NextRequest) {
   const include = searchParams.get("include");
 
   try {
-    const bloggers = await bloggerService.listBloggers();
+    let bloggers = await bloggerService.listBloggers();
 
     if (include === "latest_opinion") {
+      // 雷达页：隐藏停用博主；运维列表（无 include）返回全部
+      bloggers = bloggers.filter((b) => b.disabled === 0);
       const enriched = bloggers.map((blogger) => {
         // Latest work + opinion
         const latestWork = db

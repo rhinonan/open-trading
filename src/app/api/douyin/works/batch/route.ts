@@ -15,8 +15,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "workIds must be a non-empty array" }, { status: 400 });
     }
 
-    if (action !== "transcribe" && action !== "summarize") {
-      return Response.json({ error: "action must be 'transcribe' or 'summarize'" }, { status: 400 });
+    if (action !== "transcribe" && action !== "summarize" && action !== "evaluate") {
+      return Response.json({ error: "action must be 'transcribe', 'summarize' or 'evaluate'" }, { status: 400 });
     }
 
     const result = await batchOperate(workIds, action);

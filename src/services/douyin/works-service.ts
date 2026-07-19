@@ -4,6 +4,9 @@ import { works, bloggers, predictionItems } from "@/db/schema";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
 import { extractOpinion } from "@/services/douyin/opinion-service";
 import { startTranscribeWork } from "@/services/douyin/pipeline-service";
+import { enqueueForEvaluation } from "@/services/douyin/eval-queue";
+import { getEvalRunner } from "@/services/douyin/eval-runner";
+import { ensureSchedulerStarted } from "@/services/scheduler";
 import type {
   WorkWithBlogger,
   WorksFilter,
@@ -275,10 +278,22 @@ export async function summarizeWork(workId: number): Promise<{ success: boolean;
 
 export async function batchOperate(
   workIds: number[],
-  action: "transcribe" | "summarize"
+  action: "transcribe" | "summarize" | "evaluate"
 ): Promise<{ total: number; succeeded: number; failed: number; errors: Array<{ workId: number; error: string }> }> {
+  ensureSchedulerStarted();
   const errors: Array<{ workId: number; error: string }> = [];
   let succeeded = 0;
+
+  if (action === "evaluate") {
+    // 按 id 入队：enqueue 内部已过滤 status；changes=0 的 id 记失败
+    for (const workId of workIds) {
+      const n = enqueueForEvaluation({ workIds: [workId] });
+      if (n > 0) succeeded++;
+      else errors.push({ workId, error: "不满足评判条件（需已转写且未评判/失败）" });
+    }
+    getEvalRunner().kick();
+    return { total: workIds.length, succeeded, failed: errors.length, errors };
+  }
 
   for (const workId of workIds) {
     let result: { success: boolean; error?: string };
