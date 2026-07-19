@@ -1,309 +1,252 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
-import { EvalDetailPanel } from "./EvalDetailPanel";
-import type { WorkWithBlogger, JudgmentResult, PredictionItem } from "@/types";
+import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { FileText, RefreshCw, Lightbulb, Scale } from "lucide-react";
+import type { WorkWithBlogger } from "@/types";
 
-const TRANSCRIPT_STATUS_CONFIG: Record<
+const TRANSCRIPT_STATUS: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { label: string; className: string }
 > = {
-  pending: { label: "⏳ 待处理", variant: "secondary" },
-  processing: { label: "🔄 转写中", variant: "outline" },
-  done: { label: "✅ 已转写", variant: "default" },
-  failed: { label: "❌ 失败", variant: "destructive" },
+  pending:   { label: "待转写", className: "bg-muted text-muted-foreground" },
+  processing: { label: "转写中", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+  done:      { label: "已转写", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  failed:    { label: "失败",   className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
 };
 
-const JUDGMENT_CONFIG: Record<
+const EVAL_STATUS: Record<
   string,
-  { label: string; color: string; icon: string }
+  { label: string; className: string }
 > = {
-  correct: { label: "正确", color: "text-green-600 dark:text-green-400", icon: "✅" },
-  mostly_correct: { label: "基本正确", color: "text-emerald-600 dark:text-emerald-400", icon: "💚" },
-  incorrect: { label: "不正确", color: "text-red-600 dark:text-red-400", icon: "❌" },
-  not_applicable: { label: "不涉及", color: "text-gray-400", icon: "➖" },
-  not_yet: { label: "待验证", color: "text-amber-500", icon: "⏳" },
+  none:       { label: "未评判", className: "bg-muted text-muted-foreground" },
+  pending:    { label: "待评判", className: "bg-muted text-muted-foreground" },
+  processing: { label: "评判中", className: "bg-yellow-100 text-yellow-800" },
+  done:       { label: "已评判", className: "bg-green-100 text-green-800" },
+  failed:     { label: "失败",   className: "bg-red-100 text-red-800" },
 };
-
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp * 1000;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  if (days < 7) return `${days}天前`;
-  return new Date(timestamp * 1000).toLocaleDateString("zh-CN");
-}
 
 function formatDuration(ms: number): string {
+  if (!ms || ms <= 0) return "-";
   const totalSec = Math.floor(ms / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
+interface WorkRowProps {
+  work: WorkWithBlogger;
+  onDetail: () => void;
+  onTranscribe: () => void;
+  onSummarize: () => void;
+  onEvaluate: () => void;
+}
+
 export function WorkRow({
   work,
-  selected,
-  onToggle,
+  onDetail,
   onTranscribe,
   onSummarize,
-  onExpand,
-  isExpanded,
-}: {
-  work: WorkWithBlogger;
-  selected: boolean;
-  onToggle: (id: number) => void;
-  onTranscribe: (id: number) => void;
-  onSummarize: (id: number) => void;
-  onExpand: (id: number | null) => void;
-  isExpanded: boolean;
-}) {
-  const tStatus = TRANSCRIPT_STATUS_CONFIG[work.transcriptStatus] ?? {
+  onEvaluate,
+}: WorkRowProps) {
+  const tStatus = TRANSCRIPT_STATUS[work.transcriptStatus] ?? {
     label: work.transcriptStatus,
-    variant: "secondary" as const,
+    className: "bg-muted",
   };
-  const hasOpinion = work.opinionSummary && work.opinionSummary.length > 0;
-  const jConfig = work.judgment?.latestItem
-    ? JUDGMENT_CONFIG[work.judgment.latestItem.judgment as JudgmentResult]
-    : null;
+  const evalStatusKey = work.judgment?.evalStatus ?? "none";
+  const eStatus = EVAL_STATUS[evalStatusKey] ?? {
+    label: evalStatusKey,
+    className: "bg-muted",
+  };
+
+  const isVideo = work.mediaType === 4;
   const canTranscribe =
     work.transcriptStatus === "pending" || work.transcriptStatus === "failed";
   const canSummarize =
-    work.transcriptStatus === "done" && !hasOpinion;
+    work.transcriptStatus === "done" && !work.opinionSummary;
+  const canEvaluate =
+    work.transcriptStatus === "done" &&
+    (evalStatusKey === "none" || evalStatusKey === "failed");
 
-  // Expanded detail state
-  const [evalItems, setEvalItems] = useState<PredictionItem[]>([]);
-  const [evalItemsLoading, setEvalItemsLoading] = useState(false);
-
-  useEffect(() => {
-    if (isExpanded && work.judgment?.evalStatus === "done") {
-      setEvalItemsLoading(true);
-      fetch(`/api/douyin/records?workId=${work.id}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.success) setEvalItems(data.items);
-        })
-        .catch(() => {})
-        .finally(() => setEvalItemsLoading(false));
-    }
-  }, [isExpanded, work.id, work.judgment?.evalStatus]);
-
-  const isJudged = work.judgment?.latestItem?.judgment;
-  // Aggregate badge - show counts if available
-  const aggBadge = work.judgment && (
-    work.judgment.evaluable > 0 ||
-    work.judgment.notYet > 0 ||
-    work.judgment.notApplicable > 0
-  );
+  const opinionText = work.opinionSummary || "";
 
   return (
-    <>
-      <tr
-        className={`border-b hover:bg-muted/50 transition-colors cursor-pointer ${
-          selected ? "bg-accent/50" : ""
-        }`}
-        onClick={() => onToggle(work.id)}
-        onDoubleClick={() => onExpand(isExpanded ? null : work.id)}
-      >
-        <td className="pl-4 py-3 w-10">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={() => onToggle(work.id)}
-            className="h-4 w-4 rounded border-gray-300 cursor-pointer accent-primary"
-            onClick={(e) => e.stopPropagation()}
+    <tr className="border-b hover:bg-muted/30 transition-colors">
+      {/* 封面 */}
+      <td className="py-2 pl-4">
+        {work.coverUrl ? (
+          <img
+            src={work.coverUrl}
+            alt=""
+            className="h-10 w-10 rounded object-cover bg-muted"
+            loading="lazy"
           />
-        </td>
-        <td className="py-3 pr-3">
-          <div className="flex items-center gap-2">
-            {work.blogger.avatarUrl ? (
-              <img
-                src={work.blogger.avatarUrl}
-                alt={work.blogger.nickname}
-                className="h-6 w-6 rounded-full object-cover shrink-0"
-              />
-            ) : (
-              <div className="h-6 w-6 rounded-full bg-muted shrink-0" />
-            )}
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate max-w-[120px]">
-                {work.blogger.nickname}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {(work.blogger.followerCount ?? 0).toLocaleString()} 粉丝
-              </p>
-            </div>
+        ) : (
+          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </div>
-        </td>
-        <td className="py-3 pr-3">
-          <div className="flex items-center gap-2 min-w-0">
-            {work.coverUrl ? (
-              <img
-                src={work.coverUrl}
-                alt=""
-                className="h-14 w-10 rounded-sm object-cover shrink-0 bg-muted"
-                loading="lazy"
-              />
-            ) : (
-              <div className="h-14 w-10 rounded-sm bg-muted shrink-0" />
-            )}
-            <div className="min-w-0">
-              <p className="text-sm truncate max-w-[280px]">
-                {work.desc || "(无文案)"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {formatDuration(work.duration)}
-              </p>
-            </div>
-          </div>
-        </td>
-        <td className="py-3 pr-3 text-sm text-muted-foreground whitespace-nowrap">
-          <span title={new Date(work.publishedAt * 1000).toLocaleString("zh-CN")}>
-            {formatRelativeTime(work.publishedAt)}
-          </span>
-        </td>
-        <td className="py-3 pr-3">
-          <Badge variant={tStatus.variant}>{tStatus.label}</Badge>
-        </td>
-        <td className="py-3 pr-3">
-          {hasOpinion ? (
-            <Badge variant="default">✅ 已提取</Badge>
-          ) : work.transcriptStatus === "done" ? (
-            <span className="text-xs text-muted-foreground">—</span>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
-        </td>
-        <td className="py-3 pr-3">
-          <div className="flex flex-col gap-1">
-            {jConfig ? (
-              <span className={`text-xs font-medium ${jConfig.color}`}>
-                {jConfig.icon} {jConfig.label}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-            {aggBadge && (
-              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs">
-                {work.judgment!.evaluable > 0 && (
-                  <>{work.judgment!.correct}✓ {work.judgment!.incorrect}✗</>
-                )}
-                {work.judgment!.notYet > 0 && (
-                  <span className="text-amber-500">{work.judgment!.notYet}⏳</span>
-                )}
-                {work.judgment!.evaluable === 0 && work.judgment!.notYet === 0 && "无预测"}
-              </span>
-            )}
-          </div>
-        </td>
-        <td className="py-3 pr-4">
-          <div className="flex items-center gap-1">
-            {canTranscribe && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTranscribe(work.id);
-                }}
-                className="px-2 py-1 text-xs rounded hover:bg-accent transition-colors"
-                title="转写"
-              >
-                🎤
-              </button>
-            )}
-            {canSummarize && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSummarize(work.id);
-                }}
-                className="px-2 py-1 text-xs rounded hover:bg-accent transition-colors"
-                title="提取观点"
-              >
-                📝
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onExpand(isExpanded ? null : work.id);
-              }}
-              className="px-2 py-1 text-xs rounded hover:bg-accent transition-colors"
-              title="展开详情"
+        )}
+      </td>
+
+      {/* 描述 */}
+      <td className="py-2 max-w-[200px]">
+        <p className="text-sm truncate" title={work.desc || undefined}>
+          {work.desc || "(无文案)"}
+        </p>
+      </td>
+
+      {/* 类型 */}
+      <td className="py-2">
+        <Badge
+          variant="secondary"
+          className={
+            isVideo
+              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+              : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+          }
+        >
+          {isVideo ? "视频" : "图集"}
+        </Badge>
+      </td>
+
+      {/* 时长 */}
+      <td className="py-2 text-sm text-muted-foreground whitespace-nowrap">
+        {isVideo ? formatDuration(work.duration) : "-"}
+      </td>
+
+      {/* 转写状态 */}
+      <td className="py-2">
+        <Badge className={`text-xs ${tStatus.className}`}>
+          {tStatus.label}
+        </Badge>
+      </td>
+
+      {/* 观点 */}
+      <td className="py-2">
+        {opinionText ? (
+          <HoverCard>
+            <HoverCardTrigger
+              render={
+                <span className="text-sm cursor-default truncate block max-w-[120px]" />
+              }
             >
-              {isExpanded ? "▲" : "▶"}
-            </button>
-          </div>
-        </td>
-      </tr>
-      {isExpanded && (
-        <tr key={`detail-${work.id}`}>
-          <td colSpan={8} className="bg-muted/30 px-4 py-3">
-            {work.judgment?.evalStatus === "done" && evalItems.length > 0 ? (
-              <EvalDetailPanel items={evalItems} />
-            ) : evalItemsLoading ? (
-              <div className="text-sm text-muted-foreground py-2">加载中...</div>
-            ) : (
-              <WorkDetailPanel work={work} />
-            )}
-            {/* If judged but items not yet loaded, also show work detail */}
-            {work.judgment?.evalStatus !== "done" && !evalItemsLoading && (
-              <WorkDetailPanel work={work} />
-            )}
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
-
-function WorkDetailPanel({ work }: { work: WorkWithBlogger }) {
-  let stats: Record<string, number> = {};
-  try {
-    stats = JSON.parse(work.statistics || "{}");
-  } catch {}
-
-  return (
-    <div className="flex gap-4">
-      {work.coverUrl && (
-        <img
-          src={work.coverUrl}
-          alt=""
-          className="h-32 w-24 rounded object-cover shrink-0 bg-muted"
-        />
-      )}
-      <div className="flex-1 space-y-2 min-w-0">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-1">完整文案</p>
-          <p className="text-sm whitespace-pre-wrap">
-            {work.desc || "(无文案)"}
-          </p>
-        </div>
-        {work.transcript && work.transcriptStatus === "done" && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">转写文本</p>
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">
-              {work.transcript}
-            </p>
-          </div>
+              {opinionText.length > 30
+                ? opinionText.slice(0, 30) + "…"
+                : opinionText}
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80 text-sm leading-relaxed max-h-60 overflow-auto">
+              {opinionText}
+            </HoverCardContent>
+          </HoverCard>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
         )}
-        {work.opinionSummary && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">观点摘要</p>
-            <p className="text-sm">{work.opinionSummary}</p>
+      </td>
+
+      {/* 评判状态 */}
+      <td className="py-2">
+        {work.judgment &&
+        (work.judgment.evaluable > 0 ||
+          work.judgment.notYet > 0 ||
+          work.judgment.notApplicable > 0) ? (
+          <div className="flex items-center gap-1 text-xs">
+            {work.judgment.correct > 0 && (
+              <span title="正确">✅{work.judgment.correct}</span>
+            )}
+            {work.judgment.mostlyCorrect > 0 && (
+              <span title="基本正确">💚{work.judgment.mostlyCorrect}</span>
+            )}
+            {work.judgment.incorrect > 0 && (
+              <span title="不正确">❌{work.judgment.incorrect}</span>
+            )}
+            {work.judgment.notYet > 0 && (
+              <span title="待验证">⏳{work.judgment.notYet}</span>
+            )}
           </div>
+        ) : (
+          <Badge className={`text-xs ${eStatus.className}`}>
+            {eStatus.label}
+          </Badge>
         )}
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>👍 {stats.digg_count?.toLocaleString() || 0}</span>
-          <span>💬 {stats.comment_count?.toLocaleString() || 0}</span>
-          <span>↗ {stats.share_count?.toLocaleString() || 0}</span>
-          <span>▶ {stats.play_count?.toLocaleString() || 0}</span>
+      </td>
+
+      {/* 操作 */}
+      <td className="py-2 pr-4">
+        <div className="flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="ghost" size="icon" className="h-7 w-7" />}
+              onClick={onDetail}
+            >
+              <FileText className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>详情</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={!canTranscribe}
+                />
+              }
+              onClick={onTranscribe}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              {work.transcriptStatus === "processing"
+                ? "转写中…"
+                : canTranscribe
+                  ? "转写"
+                  : "无法转写"}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={!canSummarize}
+                />
+              }
+              onClick={onSummarize}
+            >
+              <Lightbulb className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              {canSummarize ? "观点提取" : "无法提取"}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={!canEvaluate}
+                />
+              }
+              onClick={onEvaluate}
+            >
+              <Scale className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              {canEvaluate ? "评判" : "无法评判"}
+            </TooltipContent>
+          </Tooltip>
         </div>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }
