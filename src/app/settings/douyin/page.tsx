@@ -97,6 +97,51 @@ export default function DouyinSettingsPage() {
     }
   };
 
+  const handleUpdateProfile = async (blogger: DouyinBlogger) => {
+    try {
+      const res = await fetch(
+        `/api/douyin/bloggers/${blogger.slug}/update-profile`,
+        { method: "POST" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showMessage(`已更新「${blogger.nickname}」资料`, "success", {
+          agentLog: false,
+        });
+        fetchBloggers();
+      } else {
+        showMessage(data.error || "更新资料失败", "error");
+      }
+    } catch {
+      showMessage("更新资料请求失败", "error");
+    }
+  };
+
+  const handleToggleDisabled = async (blogger: DouyinBlogger) => {
+    const next = blogger.disabled === 0;
+    try {
+      const res = await fetch(`/api/douyin/bloggers/${blogger.slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disabled: next }),
+      });
+      if (res.ok) {
+        showMessage(
+          next
+            ? `已停用「${blogger.nickname}」`
+            : `已启用「${blogger.nickname}」`,
+          "success",
+          { agentLog: false }
+        );
+        fetchBloggers();
+      } else {
+        showMessage("切换停用状态失败", "error");
+      }
+    } catch {
+      showMessage("切换停用状态失败", "error");
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────
 
   return (
@@ -131,6 +176,8 @@ export default function DouyinSettingsPage() {
           selectedSlug={selectedSlug}
           onSelect={setSelectedSlug}
           onScan={handleScan}
+          onUpdateProfile={handleUpdateProfile}
+          onToggleDisabled={handleToggleDisabled}
           onDelete={handleDelete}
           onAdd={() => setAddDialogOpen(true)}
         />
