@@ -39,7 +39,8 @@ export default function DouyinSettingsPage() {
   const fetchBloggers = useCallback(async () => {
     setLoadingBloggers(true);
     try {
-      const res = await fetch("/api/douyin/bloggers?include=latest_opinion");
+      // 运维列表需含停用博主；勿带 include=latest_opinion（该模式会过滤 disabled）
+      const res = await fetch("/api/douyin/bloggers");
       if (res.ok) setBloggers(await res.json());
     } catch {
       // network error
