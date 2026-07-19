@@ -2,10 +2,13 @@
   "name": "open-trading",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.33.3",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.13.0",
+    "pnpm": ">=10"
   },
   "scripts": {
+    "preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.includes('pnpm')){console.error('此项目固定使用 pnpm，请运行: corepack enable && pnpm install'); process.exit(1)}\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

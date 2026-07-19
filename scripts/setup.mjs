@@ -8,7 +8,6 @@
  *
  * 用法（在仓库根目录）：
  *   pnpm setup
- *   npm run setup
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -86,4 +85,4 @@ if (push.status !== 0) {
   fail(`db:push 失败 (exit ${push.status ?? "null"})`, push.status ?? 1);
 }
 
-log("完成。下一步：编辑 .env（若刚生成）后执行 pnpm dev / npm run dev");
+log("完成。下一步：编辑 .env（若刚生成）后执行 pnpm dev");

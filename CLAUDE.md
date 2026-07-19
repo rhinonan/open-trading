@@ -6,18 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用命令
 
-- `pnpm setup` / `npm run setup` — **新 clone 一键准备**：检查 Node、无 `.env` 时从 example 复制、创建 `data/`（或 `DATA_ROOT`）、`drizzle-kit push`
-- `npm run dev` — 启动开发服务器（http://localhost:3000）
-- `npm run build` / `npm start` — 生产构建 / 启动
-- `npm run lint` — ESLint
-- `npm test` — vitest 单测（内存 SQLite 上跑队列/runner 逻辑）
-- `npm run db:generate` — 根据 `src/db/schema.ts` 生成迁移 SQL 到 `drizzle/`
-- `npm run db:push` — 将 schema 直接推送到 `data/douyin.db`
-- `npm run db:studio` — Drizzle Studio
-- `npx tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
+包管理器固定为 **pnpm**（见 `packageManager` 字段；勿再用 npm/yarn 装依赖）。
+
+- `pnpm setup` — **新 clone 一键准备**：检查 Node、无 `.env` 时从 example 复制、创建 `data/`（或 `DATA_ROOT`）、`drizzle-kit push`
+- `pnpm dev` — 启动开发服务器（http://localhost:3000）
+- `pnpm build` / `pnpm start` — 生产构建 / 启动
+- `pnpm lint` — ESLint
+- `pnpm test` — vitest 单测（内存 SQLite 上跑队列/runner 逻辑）
+- `pnpm db:generate` — 根据 `src/db/schema.ts` 生成迁移 SQL 到 `drizzle/`
+- `pnpm db:push` — 将 schema 直接推送到 `data/douyin.db`
+- `pnpm db:studio` — Drizzle Studio
+- `pnpm exec tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
 - Docker 部署：`docker compose up -d`（端口 3003，挂载 `./data`）
 
-Node >= 22.13.0。新环境推荐：`pnpm install` → `pnpm setup` → 编辑 `.env` 填密钥（TikHub、newapi、讯飞 ASR）→ `pnpm dev`。  
+Node >= 22.13.0。新环境推荐：`corepack enable` → `pnpm install` → `pnpm setup` → 编辑 `.env` 填密钥（TikHub、newapi、讯飞 ASR）→ `pnpm dev`。  
 运行时 `ensureDataRoot()` 会自动创建数据目录；空库表结构仍需 `setup` / `db:push` 写入。
 
 ## 架构总览
