@@ -1,3 +1,4 @@
+// src/hooks/use-agent-logs.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -6,6 +7,7 @@ export interface LogItem {
   traceId: string;
   spanId: string;
   entityName: string;
+  entityId: string;
   spanType: string;
   name: string;
   startedAt: string;
@@ -14,9 +16,11 @@ export interface LogItem {
   inputPreview: string;
   outputPreview: string;
   callSource: "chat" | "workflow" | "test";
+  runId: string | null;
+  threadId: string | null;
 }
 
-interface Pagination {
+export interface Pagination {
   total: number;
   page: number;
   perPage: number;
@@ -54,7 +58,12 @@ export function useAgentLogs(filters?: UseAgentLogsFilters) {
       if (res.ok) {
         setLogs(data.logs ?? []);
         setPagination(
-          data.pagination ?? { total: 0, page: 0, perPage: 20, hasMore: false }
+          data.pagination ?? {
+            total: 0,
+            page: 0,
+            perPage: 20,
+            hasMore: false,
+          },
         );
       } else {
         setError(data.error ?? "加载失败");
@@ -67,7 +76,7 @@ export function useAgentLogs(filters?: UseAgentLogsFilters) {
   }, [filters?.agentName, filters?.page, filters?.perPage]);
 
   useEffect(() => {
-    fetchLogs();
+    void fetchLogs();
   }, [fetchLogs]);
 
   return { logs, pagination, loading, error, refetch: fetchLogs };
@@ -85,6 +94,8 @@ export interface SpanDetail {
   input: unknown;
   output: unknown;
   attributes: Record<string, unknown> | null;
+  runId: string | null;
+  threadId: string | null;
 }
 
 export function useAgentLogDetail(traceId: string | null) {
@@ -95,6 +106,8 @@ export function useAgentLogDetail(traceId: string | null) {
   useEffect(() => {
     if (!traceId) {
       setSpans([]);
+      setError("");
+      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -102,7 +115,7 @@ export function useAgentLogDetail(traceId: string | null) {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/agents/logs/${traceId}`);
+        const res = await fetch(`/api/agents/logs/${encodeURIComponent(traceId)}`);
         const data = await res.json();
         if (cancelled) return;
         if (res.ok) {

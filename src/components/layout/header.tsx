@@ -25,6 +25,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/sentiment": "舆情分析",
   "/financials": "财报 & 研报",
   "/agents": "Agent 管理",
+  "/agents/logs": "Agent 日志",
   "/settings": "设置",
   "/settings/douyin": "抖音雷达",
   "/settings/skills": "Skills",

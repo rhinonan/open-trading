@@ -106,15 +106,15 @@ export default function DouyinSettingsPage() {
             <div
               className={`flex items-center justify-between px-4 py-2 border-b text-sm shrink-0 ${
                 messageType === "error"
-                  ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
-                  : "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                  ? "bg-danger/10 text-danger"
+                  : "bg-success/10 text-success"
               }`}
             >
               <span className="flex items-center gap-2">
                 {message}
                 {messageType === "success" && (
                   <a
-                    href="/settings/agents"
+                    href="/agents/logs"
                     target="_blank"
                     className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
                   >

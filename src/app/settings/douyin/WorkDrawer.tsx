@@ -14,13 +14,17 @@ import type { WorkWithBlogger, PredictionItem, JudgmentResult } from "@/types";
 
 const JUDGMENT_CONFIG: Record<
   string,
-  { label: string; color: string; icon: string }
+  {
+    label: string;
+    variant: "success" | "info" | "danger" | "warning" | "neutral";
+    icon: string;
+  }
 > = {
-  correct:         { label: "正确",   color: "text-green-500",  icon: "✅" },
-  mostly_correct:  { label: "基本正确", color: "text-emerald-500", icon: "💚" },
-  incorrect:       { label: "不正确", color: "text-red-500",    icon: "❌" },
-  not_applicable:  { label: "不涉及", color: "text-gray-400",   icon: "—" },
-  not_yet:         { label: "待验证", color: "text-amber-500",  icon: "⏳" },
+  correct: { label: "正确", variant: "success", icon: "✅" },
+  mostly_correct: { label: "基本正确", variant: "info", icon: "💚" },
+  incorrect: { label: "不正确", variant: "danger", icon: "❌" },
+  not_applicable: { label: "不涉及", variant: "neutral", icon: "—" },
+  not_yet: { label: "待验证", variant: "warning", icon: "⏳" },
 };
 
 interface WorkDrawerProps {
@@ -157,10 +161,7 @@ export function WorkDrawer({ work, onClose }: WorkDrawerProps) {
                         >
                           <div className="flex items-center gap-2 mb-1">
                             {jc && (
-                              <Badge
-                                variant="secondary"
-                                className={jc.color}
-                              >
+                              <Badge variant={jc.variant}>
                                 {jc.icon} {jc.label}
                               </Badge>
                             )}
@@ -184,7 +185,7 @@ export function WorkDrawer({ work, onClose }: WorkDrawerProps) {
                             </details>
                           )}
                           {item.judgment === "not_yet" && item.verifiableAfter && (
-                            <p className="text-xs text-amber-500 mt-1">
+                            <p className="text-xs text-warning mt-1">
                               ⏳ 预计 {item.verifiableAfter} 后可验证
                             </p>
                           )}

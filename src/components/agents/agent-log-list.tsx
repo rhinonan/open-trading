@@ -65,7 +65,7 @@ export function AgentLogList({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center py-16 text-red-500 text-sm">
+      <div className="flex items-center justify-center py-16 text-danger text-sm">
         {error}
       </div>
     );
@@ -123,11 +123,11 @@ export function AgentLogList({
                   </td>
                   <td className="py-2 pr-3">
                     {hasError ? (
-                      <XCircle className="h-4 w-4 text-red-500" />
+                      <XCircle className="h-4 w-4 text-danger" />
                     ) : isRunning ? (
-                      <Clock className="h-4 w-4 text-yellow-500" />
+                      <Clock className="h-4 w-4 text-warning" />
                     ) : (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <CheckCircle2 className="h-4 w-4 text-success" />
                     )}
                   </td>
                   <td className="py-2 pr-3 text-right text-xs text-muted-foreground whitespace-nowrap">

@@ -8,25 +8,28 @@ import { FileText, RefreshCw, Lightbulb, Scale } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { WorkWithBlogger } from "@/types";
 
-const TRANSCRIPT_STATUS: Record<
-  string,
-  { label: string; className: string }
-> = {
-  pending:   { label: "待转写", className: "bg-muted text-muted-foreground" },
-  processing: { label: "转写中", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
-  done:      { label: "已转写", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-  failed:    { label: "失败",   className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
-};
+type StatusVariant =
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "neutral"
+  | "secondary";
 
-const EVAL_STATUS: Record<
-  string,
-  { label: string; className: string }
-> = {
-  none:       { label: "未评判", className: "bg-muted text-muted-foreground" },
-  pending:    { label: "待评判", className: "bg-muted text-muted-foreground" },
-  processing: { label: "评判中", className: "bg-yellow-100 text-yellow-800" },
-  done:       { label: "已评判", className: "bg-green-100 text-green-800" },
-  failed:     { label: "失败",   className: "bg-red-100 text-red-800" },
+const TRANSCRIPT_STATUS: Record<string, { label: string; variant: StatusVariant }> =
+  {
+    pending: { label: "待转写", variant: "neutral" },
+    processing: { label: "转写中", variant: "warning" },
+    done: { label: "已转写", variant: "success" },
+    failed: { label: "失败", variant: "danger" },
+  };
+
+const EVAL_STATUS: Record<string, { label: string; variant: StatusVariant }> = {
+  none: { label: "未评判", variant: "neutral" },
+  pending: { label: "待评判", variant: "neutral" },
+  processing: { label: "评判中", variant: "warning" },
+  done: { label: "已评判", variant: "success" },
+  failed: { label: "失败", variant: "danger" },
 };
 
 function formatDuration(ms: number): string {
@@ -60,12 +63,12 @@ export function WorkRow({
 }: WorkRowProps) {
   const tStatus = TRANSCRIPT_STATUS[work.transcriptStatus] ?? {
     label: work.transcriptStatus,
-    className: "bg-muted",
+    variant: "neutral" as const,
   };
   const evalStatusKey = work.judgment?.evalStatus ?? "none";
   const eStatus = EVAL_STATUS[evalStatusKey] ?? {
     label: evalStatusKey,
-    className: "bg-muted",
+    variant: "neutral" as const,
   };
 
   const isVideo = work.mediaType === 4;
@@ -107,14 +110,7 @@ export function WorkRow({
 
       {/* 类型 */}
       <td className="py-2">
-        <Badge
-          variant="secondary"
-          className={
-            isVideo
-              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-              : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
-          }
-        >
+        <Badge variant={isVideo ? "info" : "secondary"}>
           {isVideo ? "视频" : "图集"}
         </Badge>
       </td>
@@ -126,9 +122,7 @@ export function WorkRow({
 
       {/* 转写状态 */}
       <td className="py-2">
-        <Badge className={`text-xs ${tStatus.className}`}>
-          {tStatus.label}
-        </Badge>
+        <Badge variant={tStatus.variant}>{tStatus.label}</Badge>
       </td>
 
       {/* 观点 */}
@@ -161,22 +155,28 @@ export function WorkRow({
           work.judgment.notApplicable > 0) ? (
           <div className="flex items-center gap-1 text-xs">
             {work.judgment.correct > 0 && (
-              <span title="正确">✅{work.judgment.correct}</span>
+              <span title="正确" className="text-success">
+                ✅{work.judgment.correct}
+              </span>
             )}
             {work.judgment.mostlyCorrect > 0 && (
-              <span title="基本正确">💚{work.judgment.mostlyCorrect}</span>
+              <span title="基本正确" className="text-info">
+                💚{work.judgment.mostlyCorrect}
+              </span>
             )}
             {work.judgment.incorrect > 0 && (
-              <span title="不正确">❌{work.judgment.incorrect}</span>
+              <span title="不正确" className="text-danger">
+                ❌{work.judgment.incorrect}
+              </span>
             )}
             {work.judgment.notYet > 0 && (
-              <span title="待验证">⏳{work.judgment.notYet}</span>
+              <span title="待验证" className="text-warning">
+                ⏳{work.judgment.notYet}
+              </span>
             )}
           </div>
         ) : (
-          <Badge className={`text-xs ${eStatus.className}`}>
-            {eStatus.label}
-          </Badge>
+          <Badge variant={eStatus.variant}>{eStatus.label}</Badge>
         )}
       </td>
 

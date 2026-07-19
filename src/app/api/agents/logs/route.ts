@@ -1,13 +1,26 @@
 // src/app/api/agents/logs/route.ts
+// 查询 Mastra observability 落库的 agent 调用 root span（AGENT_RUN）
 import { NextRequest } from "next/server";
-import Database from "better-sqlite3";
+import { SpanType, EntityType } from "@mastra/core/observability";
 import { mastra } from "@/mastra";
-import { dataPath } from "@/lib/data-root";
+import {
+  AGENT_ID_BY_KEY,
+  AGENT_KEY_BY_ID,
+  type AgentKey,
+} from "@/mastra/agent-meta";
+import { isAgentKey } from "@/mastra/get-agent";
+import {
+  parseSpanToReplayMessages,
+  textFromContent,
+} from "@/lib/agent-log-messages";
 
-interface LogItem {
+export interface AgentLogItem {
   traceId: string;
   spanId: string;
+  /** 展示用：优先注册键，否则原始 entityName（通常是 agent id） */
   entityName: string;
+  /** span 原始 entityName（agent id） */
+  entityId: string;
   spanType: string;
   name: string;
   startedAt: string;
@@ -16,204 +29,160 @@ interface LogItem {
   inputPreview: string;
   outputPreview: string;
   callSource: "chat" | "workflow" | "test";
+  runId: string | null;
+  threadId: string | null;
 }
 
-/** 安全截断，不切断多字节 UTF-8 字符 */
-function truncatePreview(value: unknown, maxLen = 100): string {
-  if (value == null) return "";
-  const text = typeof value === "string" ? value : JSON.stringify(value);
+function toIso(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string" && value) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toISOString();
+  }
+  return "";
+}
+
+/** 安全截断，不切断多字节字符 */
+function clip(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   const chars = Array.from(text);
-  return chars.length > maxLen ? chars.slice(0, maxLen).join("") + "…" : text;
-}
-
-function inferCallSource(
-  span: Record<string, unknown>
-): "chat" | "workflow" | "test" {
-  if (span.threadId) return "chat";
-  if (span.runId) return "workflow";
-  return "test";
+  return chars.length > maxLen
+    ? chars.slice(0, maxLen).join("") + "…"
+    : text;
 }
 
 /**
- * 从 MessagePack 二进制 Buffer 中提取可读文本。
- * 策略：找到 "transcript" 字段标记，提取紧随其后的长 CJK 文本段。
- * 回退：取整个 buffer 去噪后的最长连续可读段。
+ * 列表摘要：优先按 UIMessage / {text} / parts 抽纯文本，
+ * 避免把 chat span 的 JSON 直接 stringify 成乱码预览。
  */
-function extractMsgpackText(buf: Buffer, fieldMarker: string): string {
+function truncatePreview(value: unknown, maxLen = 100): string {
+  if (value == null) return "";
+  // 尝试当「整段 input」解析（UIMessage[] / string / {text}）
+  const asMessages = parseSpanToReplayMessages(value, null);
+  if (asMessages.length > 0) {
+    const joined = asMessages.map((m) => m.text).filter(Boolean).join(" / ");
+    if (joined) return clip(joined, maxLen);
+  }
+  const fromContent = textFromContent(value).trim();
+  if (fromContent) return clip(fromContent, maxLen);
+  if (typeof value === "string") return clip(value, maxLen);
   try {
-    const str = buf.toString("utf8");
-    // 在 "transcript" 或 "opinionSummary" 后寻找长 CJK 文本
-    // MessagePack 字符串格式：类型标记(1B) + 长度(N bytes) + UTF-8 数据
-    // 长文本(>31B)的类型标记范围是 0xd9-0xdb，长度字节位于标记和文本之间
-    const idx = str.indexOf(fieldMarker);
-    if (idx >= 0) {
-      // 跳到 fieldMarker 之后，跳过 MessagePack 头部
-      let pos = idx + fieldMarker.length;
-      // 跳过类型标记和长度字节（最多 5 字节的 msgpack 头部）
-      for (let i = 0; i < 5 && pos < str.length; i++) {
-        const code = str.charCodeAt(pos);
-        if (code >= 0x20 && code <= 0x7e) break; // 可打印 ASCII，可能是下个字段名
-        if (code >= 0x4e00 && code <= 0x9fff) break; // CJK 开始
-        if (code >= 0x3000) break; // 全角标点等
-        pos++;
-      }
-      // 从 pos 开始提取可读文本
-      let text = "";
-      for (let i = pos; i < Math.min(pos + 500, str.length); i++) {
-        const code = str.charCodeAt(i);
-        if (code >= 0x20 || code >= 0x3000) {
-          text += str[i];
-        } else if (text.length > 10) {
-          break; // 遇到足够长的文本后遇到控制字符，停止
-        } else {
-          text = ""; // 还不够长，重置
-        }
-      }
-      if (text.trim().length > 10) return text.trim();
-    }
-    // 回退：清理非可读字符，取最长连续段
-    const cleaned = str.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").replace(/\s+/g, " ").trim();
-    return cleaned;
+    return clip(JSON.stringify(value), maxLen);
   } catch {
     return "";
   }
 }
 
-function extractWorkflowInput(snapshot: Buffer | string | null): string {
-  if (!snapshot) return "";
-  const buf = Buffer.isBuffer(snapshot) ? snapshot : Buffer.from(snapshot, "utf8");
-  const text = extractMsgpackText(buf, "transcript") || extractMsgpackText(buf, "opinionSummary");
-  return truncatePreview(text || "", 100);
+function inferCallSource(span: {
+  threadId?: string | null;
+  runId?: string | null;
+}): "chat" | "workflow" | "test" {
+  if (span.threadId) return "chat";
+  if (span.runId) return "workflow";
+  return "test";
 }
 
-function extractWorkflowError(snapshot: Buffer | string | null): string | null {
-  if (!snapshot) return null;
-  const str = Buffer.isBuffer(snapshot) ? snapshot.toString("utf8") : snapshot;
-  if (str.includes("failed")) return "Workflow execution failed";
-  return null;
+/** 查询参数 agentName 支持注册键或 agent id */
+function resolveEntityNameFilter(agentName: string): string {
+  if (isAgentKey(agentName)) {
+    return AGENT_ID_BY_KEY[agentName as AgentKey];
+  }
+  return agentName;
+}
+
+function displayEntityName(raw: string): string {
+  return AGENT_KEY_BY_ID[raw] ?? raw;
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const agentName = searchParams.get("agentName") || undefined;
+  const agentNameParam = searchParams.get("agentName") || undefined;
   const page = Math.max(0, Number(searchParams.get("page")) || 0);
   const perPage = Math.min(
     Math.max(1, Number(searchParams.get("perPage")) || 20),
-    100
+    100,
   );
 
   try {
-    const allLogs: LogItem[] = [];
-
-    // 1. 查 agent_run spans（通过 observability store）
     const storage = mastra.getStorage();
     const obsStore = await storage?.getStore("observability");
-    if (obsStore) {
-      const filters: Record<string, unknown> = {
-        entityType: "agent",
-        spanType: "agent_run",
+    if (!obsStore) {
+      return Response.json(
+        { error: "Observability store not available" },
+        { status: 500 },
+      );
+    }
+
+    const entityNameFilter = agentNameParam
+      ? resolveEntityNameFilter(agentNameParam)
+      : undefined;
+
+    const result = await obsStore.listTraces({
+      mode: "page",
+      filters: {
+        entityType: EntityType.AGENT,
+        spanType: SpanType.AGENT_RUN,
+        ...(entityNameFilter ? { entityName: entityNameFilter } : {}),
+      },
+      pagination: { page, perPage },
+      orderBy: { field: "startedAt", direction: "DESC" },
+    });
+
+    const logs: AgentLogItem[] = (result.spans ?? []).map((span) => {
+      const s = span as {
+        traceId: string;
+        spanId: string;
+        entityName?: string | null;
+        spanType: string;
+        name: string;
+        startedAt: Date | string;
+        endedAt?: Date | string | null;
+        error?: unknown | null;
+        input?: unknown;
+        output?: unknown;
+        threadId?: string | null;
+        runId?: string | null;
       };
-      if (agentName) {
-        filters.entityName = agentName;
-      }
+      const rawEntity = s.entityName ?? "";
+      return {
+        traceId: s.traceId,
+        spanId: s.spanId,
+        entityName: displayEntityName(rawEntity),
+        entityId: rawEntity,
+        spanType: s.spanType,
+        name: s.name,
+        startedAt: toIso(s.startedAt),
+        endedAt: s.endedAt ? toIso(s.endedAt) : null,
+        error: s.error ?? null,
+        inputPreview: truncatePreview(s.input),
+        outputPreview: truncatePreview(s.output),
+        callSource: inferCallSource(s),
+        runId: s.runId ?? null,
+        threadId: s.threadId ?? null,
+      };
+    });
 
-      try {
-        const result = await obsStore.listTraces({
-          mode: "page",
-          filters,
-          pagination: { page: 0, perPage: 1000 }, // 拉取全部再合并排序
-          orderBy: {
-            field: "startedAt" as const,
-            direction: "DESC" as const,
-          },
-        });
-
-        const agentLogs: LogItem[] = (
-          (result as Record<string, unknown>).spans as Array<Record<string, unknown>> ?? []
-        ).map((span) => ({
-          traceId: span.traceId as string,
-          spanId: span.spanId as string,
-          entityName: (span.entityName as string) ?? "",
-          spanType: span.spanType as string,
-          name: span.name as string,
-          startedAt: span.startedAt as string,
-          endedAt: (span.endedAt as string) ?? null,
-          error: span.error ?? null,
-          inputPreview: truncatePreview(span.input),
-          outputPreview: truncatePreview(span.output),
-          callSource: inferCallSource(span as Record<string, unknown>),
-        }));
-        allLogs.push(...agentLogs);
-      } catch {
-        // observability 查询失败时不阻塞 workflow 查询
-      }
-    }
-
-    // 2. 查 workflow 运行记录（直接查 mastra_workflow_snapshot）
-    const mastraDbPath = dataPath("mastra.db");
-    const db = new Database(mastraDbPath, { readonly: true });
-    try {
-      const wfRows = db
-        .prepare(
-          `SELECT workflow_name, run_id, snapshot, createdAt, updatedAt
-           FROM mastra_workflow_snapshot
-           WHERE workflow_name != 'executionWorkflow' AND workflow_name != 'agentic-loop'
-           ORDER BY createdAt DESC
-           LIMIT 2000`
-        )
-        .all() as Array<{
-        workflow_name: string;
-        run_id: string;
-        snapshot: Buffer | null;
-        createdAt: string;
-        updatedAt: string;
-      }>;
-
-      for (const row of wfRows) {
-        const error = extractWorkflowError(row.snapshot);
-        allLogs.push({
-          traceId: row.run_id,
-          spanId: row.run_id,
-          entityName: row.workflow_name,
-          spanType: "workflow_run",
-          name: `Workflow: ${row.workflow_name}`,
-          startedAt: row.createdAt,
-          endedAt: row.updatedAt !== row.createdAt ? row.updatedAt : null,
-          error,
-          inputPreview: extractWorkflowInput(row.snapshot),
-          outputPreview: error ? "" : (row.updatedAt !== row.createdAt ? "完成" : "运行中"),
-          callSource: "workflow",
-        });
-      }
-    } finally {
-      db.close();
-    }
-
-    // 合并排序：按时间倒序
-    allLogs.sort(
-      (a, b) =>
-        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-    );
-
-    // 分页
-    const total = allLogs.length;
-    const start = page * perPage;
-    const paged = allLogs.slice(start, start + perPage);
+    const pagination = result.pagination ?? {
+      total: logs.length,
+      page,
+      perPage,
+      hasMore: false,
+    };
 
     return Response.json({
-      logs: paged,
+      logs,
       pagination: {
-        total,
-        page,
-        perPage,
-        hasMore: start + perPage < total,
+        total: pagination.total,
+        page: pagination.page,
+        perPage:
+          typeof pagination.perPage === "number" ? pagination.perPage : perPage,
+        hasMore: pagination.hasMore,
       },
     });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

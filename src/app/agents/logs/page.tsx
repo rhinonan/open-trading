@@ -26,7 +26,7 @@ export default function AgentLogsPage() {
   return (
     <div className="flex flex-col gap-4 h-[calc(100vh-8rem)]">
       {/* 日志列表（铺满） */}
-      <div className="flex-1 rounded-lg border bg-card overflow-hidden flex flex-col min-h-0">
+      <div className="flex-1 rounded-lg border bg-card overflow-hidden flex flex-col min-h-0 shadow-[var(--card-glow)] ring-1 ring-[var(--card-ring)]">
         <div className="px-4 py-3 border-b">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
             <ScrollText className="h-4 w-4" />
@@ -53,7 +53,7 @@ export default function AgentLogsPage() {
           if (!open) setSelectedTraceId(null);
         }}
       >
-        <SheetContent side="right" className="w-[600px] sm:max-w-[600px] p-0">
+        <SheetContent side="right" className="w-[min(90vw,880px)] sm:max-w-[880px] p-0">
           <SheetHeader className="px-4 py-3 border-b">
             <SheetTitle>
               {selectedLog?.entityName ?? "日志详情"}
