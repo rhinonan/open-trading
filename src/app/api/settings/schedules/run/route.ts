@@ -1,4 +1,5 @@
 // src/app/api/settings/schedules/run/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import {
@@ -26,9 +27,6 @@ export async function POST(req: NextRequest) {
     }
     return Response.json({ success: true, summary: result.summary });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "运行失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "运行失败" });
   }
 }

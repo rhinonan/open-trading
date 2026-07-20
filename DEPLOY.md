@@ -151,6 +151,7 @@ location / {
 |------|------|
 | 端口连不上 | `docker compose ps`；主机防火墙；是否映射 `3002:3002` |
 | 博主列表 500 / `no such column` | 看启动日志是否 schema push 失败；确认 `./data` 可写且 `DATA_ROOT=/app/data` |
+| API 500 但页面只显示失败 | 看容器/进程 stdout：应有一行 JSON，`event":"api.error"`，含 `path`/`message`/`stack`。`docker compose logs -f open-trading` |
 | 扫描没有新作品 | 确认 `DOUYIN_CACHE_MODE=false`；必要时清空或忽略 `data/api-cache` |
 | 转写失败 `ffmpeg spawn failed` | 镜像应自带 ffmpeg；确认用的是本仓库 Dockerfile 构建的镜像 |
 | 写接口 401 | 已设 `ADMIN_TOKEN`，请求需带 Bearer / `x-admin-token` |

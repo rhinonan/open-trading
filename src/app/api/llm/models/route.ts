@@ -1,4 +1,5 @@
 // src/app/api/llm/models/route.ts
+import { jsonError } from "@/lib/api-error";
 
 import { DEFAULT_NEWAPI_BASE_URL } from "@/lib/llm-constants";
 
@@ -34,9 +35,6 @@ export async function GET() {
 
     return Response.json({ models });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "获取模型列表失败" },
-      { status: 502 }
-    );
+    return jsonError(err, { status: 502, fallback: "获取模型列表失败" });
   }
 }

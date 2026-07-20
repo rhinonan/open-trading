@@ -4,16 +4,14 @@ import * as skillService from "@/services/skills-service";
 import { mastra } from "@/mastra";
 import { requireAdmin } from "@/lib/admin-auth";
 import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
+import { jsonError } from "@/lib/api-error";
 
 export async function GET() {
   try {
     const skills = skillService.listSkills();
     return Response.json({ success: true, skills });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "获取列表失败" },
-      { status: 500 },
-    );
+    return jsonError(err, { status: 500, body: "success-false", fallback: "获取列表失败" });
   }
 }
 
@@ -69,9 +67,6 @@ export async function POST(req: NextRequest) {
       batch: stagingInfo,
     });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "安装失败" },
-      { status: 500 },
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "安装失败" });
   }
 }

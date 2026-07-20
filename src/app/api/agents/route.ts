@@ -1,4 +1,5 @@
 // src/app/api/agents/route.ts
+import { jsonError } from "@/lib/api-error";
 import { mastra } from "@/mastra";
 import { AGENT_META, type AgentKey } from "@/mastra/agent-meta";
 import { isAgentKey } from "@/mastra/get-agent";
@@ -26,9 +27,6 @@ export async function GET() {
     );
     return Response.json({ agents: list });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { status: 500, fallback: "Internal error" });
   }
 }

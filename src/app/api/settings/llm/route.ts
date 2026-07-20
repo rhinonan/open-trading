@@ -1,4 +1,5 @@
 // src/app/api/settings/llm/route.ts
+import { jsonError } from "@/lib/api-error";
 import {
   getLlmModel,
   setSetting,
@@ -21,10 +22,7 @@ export async function GET() {
   try {
     return Response.json(await currentSettings());
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { status: 500, fallback: "Internal error" });
   }
 }
 
@@ -75,9 +73,6 @@ export async function PUT(request: Request) {
 
     return Response.json(await currentSettings());
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Internal error" });
   }
 }

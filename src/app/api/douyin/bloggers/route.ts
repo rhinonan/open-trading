@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { works, predictionItems } from "@/db/schema";
 import { eq, desc, and, ne } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
+import { jsonError, errorMessage } from "@/lib/api-error";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -72,10 +73,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json(bloggers);
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Internal error" });
   }
 }
 
@@ -96,9 +94,8 @@ export async function POST(request: Request) {
     const blogger = await bloggerService.addBlogger(douyinUid);
     return Response.json(blogger, { status: 201 });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Internal error";
+    const message = errorMessage(err, "Internal error");
     const status = message.includes("已存在") ? 409 : 500;
-    return Response.json({ error: message }, { status });
+    return jsonError(err, { request: request, status, fallback: "Internal error" });
   }
 }

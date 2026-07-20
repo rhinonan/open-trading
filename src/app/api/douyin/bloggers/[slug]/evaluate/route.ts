@@ -4,6 +4,7 @@ import { enqueueForEvaluation } from "@/services/douyin/eval-queue";
 import { getEvalRunner } from "@/services/douyin/eval-runner";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ensureSchedulerStarted } from "@/services/scheduler";
+import { jsonError } from "@/lib/api-error";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const denied = requireAdmin(req);
@@ -21,9 +22,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     getEvalRunner().kick();
     return Response.json({ success: true, enqueued: count });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "入队失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "入队失败" });
   }
 }

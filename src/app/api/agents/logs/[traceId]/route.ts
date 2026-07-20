@@ -2,6 +2,7 @@
 // 单条 trace 下全部 span（含 LLM / tool 子 span）
 import { NextRequest } from "next/server";
 import { mastra } from "@/mastra";
+import { jsonError } from "@/lib/api-error";
 
 export interface AgentLogSpanDetail {
   spanId: string;
@@ -94,9 +95,6 @@ export async function GET(
 
     return Response.json({ traceId, spans });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 },
-    );
+    return jsonError(err, { status: 500, fallback: "Internal error" });
   }
 }

@@ -4,6 +4,7 @@ import { works } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import * as bloggerService from "@/services/douyin/blogger-service";
 import { requireAdmin } from "@/lib/admin-auth";
+import { jsonError } from "@/lib/api-error";
 
 export async function GET(
   req: NextRequest,
@@ -42,10 +43,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ slug: str
     const blogger = await bloggerService.setBloggerDisabled(slug, body.disabled);
     return Response.json({ success: true, blogger });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "更新失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, fallback: "更新失败" });
   }
 }
 

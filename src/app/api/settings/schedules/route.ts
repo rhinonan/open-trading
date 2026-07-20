@@ -1,4 +1,5 @@
 // src/app/api/settings/schedules/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getSetting, setSetting } from "@/services/settings-service";
@@ -43,10 +44,7 @@ export async function GET() {
     const jobs = await Promise.all(JOB_DEFINITIONS.map(readJob));
     return Response.json({ success: true, jobs });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "获取失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { status: 500, body: "success-false", fallback: "获取失败" });
   }
 }
 
@@ -74,9 +72,6 @@ export async function PUT(req: NextRequest) {
     const job = await readJob(def);
     return Response.json({ success: true, job });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "保存失败" },
-      { status: 400 }
-    );
+    return jsonError(err, { request: req, status: 400, body: "success-false", fallback: "保存失败" });
   }
 }

@@ -2,6 +2,7 @@
 // 触发即返回：入队计数立即响应，转写由 pipeline-runner 后台执行，
 // 进度通过 /api/douyin/works 的 transcriptStatus 轮询。
 // （旧参数 concurrency/maxTasks 已废弃：runner 固定并发，跑到队列清空。）
+import { jsonError } from "@/lib/api-error";
 import { startTranscribePendingWorks } from "@/services/douyin/pipeline-service";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -13,9 +14,6 @@ export async function POST(request: Request) {
   try {
     return Response.json(startTranscribePendingWorks());
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Transcription failed" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Transcription failed" });
   }
 }

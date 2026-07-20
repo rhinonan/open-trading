@@ -1,4 +1,5 @@
 // src/app/api/skills/[name]/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import * as skillService from "@/services/skills-service";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -13,10 +14,7 @@ export async function GET(
     if (!skill) return Response.json({ success: false, error: "Skill 不存在" }, { status: 404 });
     return Response.json({ success: true, skill });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "获取失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { status: 500, body: "success-false", fallback: "获取失败" });
   }
 }
 
@@ -35,10 +33,7 @@ export async function PATCH(
     else return Response.json({ success: false, error: "仅支持 enable/disable" }, { status: 400 });
     return Response.json({ success: true });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "操作失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "操作失败" });
   }
 }
 
@@ -63,9 +58,6 @@ export async function DELETE(
     await skillService.purgeSkillFromMounts(name);
     return Response.json({ success: true });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "删除失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "删除失败" });
   }
 }

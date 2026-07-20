@@ -1,4 +1,5 @@
 // src/app/api/agents/test/route.ts
+import { jsonError } from "@/lib/api-error";
 import { mastra } from "@/mastra";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -38,9 +39,6 @@ export async function POST(request: Request) {
 
     return Response.json({ text: result.text });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Internal error" });
   }
 }

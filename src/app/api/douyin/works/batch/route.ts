@@ -1,4 +1,5 @@
 // src/app/api/douyin/works/batch/route.ts
+import { jsonError } from "@/lib/api-error";
 import { batchOperate } from "@/services/douyin/works-service";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -22,9 +23,6 @@ export async function POST(request: Request) {
     const result = await batchOperate(workIds, action);
     return Response.json(result);
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Batch operation failed" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Batch operation failed" });
   }
 }

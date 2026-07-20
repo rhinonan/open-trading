@@ -2,6 +2,7 @@ import { mastra } from "@/mastra";
 import { handleChatStream } from "@mastra/ai-sdk";
 import { createUIMessageStreamResponse } from "ai";
 import { requireAdmin } from "@/lib/admin-auth";
+import { jsonError } from "@/lib/api-error";
 
 export const maxDuration = 60;
 
@@ -42,9 +43,6 @@ export async function POST(request: Request) {
 
     return createUIMessageStreamResponse({ stream });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Internal error" });
   }
 }

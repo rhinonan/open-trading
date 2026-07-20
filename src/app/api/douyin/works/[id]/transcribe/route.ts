@@ -1,4 +1,5 @@
 // src/app/api/douyin/works/[id]/transcribe/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import { startTranscribeWork } from "@/services/douyin/pipeline-service";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -22,9 +23,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
     return Response.json({ success: true, workId });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Transcription failed" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, fallback: "Transcription failed" });
   }
 }

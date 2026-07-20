@@ -1,4 +1,5 @@
 // src/app/api/agents/runs/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import { mastra } from "@/mastra";
 
@@ -53,9 +54,6 @@ export async function GET(request: NextRequest) {
 
     return Response.json({ runs: mapped, total });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Internal error" });
   }
 }

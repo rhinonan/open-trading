@@ -1,4 +1,5 @@
 // src/app/api/douyin/works/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import { queryWorks } from "@/services/douyin/works-service";
 import type { WorksFilter } from "@/types";
@@ -25,9 +26,6 @@ export async function GET(request: NextRequest) {
     const result = await queryWorks(filter);
     return Response.json(result);
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, fallback: "Internal error" });
   }
 }

@@ -1,4 +1,5 @@
 // src/app/api/douyin/works/[id]/summarize/route.ts
+import { jsonError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 import { summarizeWork } from "@/services/douyin/works-service";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -21,9 +22,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
     return Response.json({ success: true, workId, summary: result.summary });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Summarization failed" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, fallback: "Summarization failed" });
   }
 }

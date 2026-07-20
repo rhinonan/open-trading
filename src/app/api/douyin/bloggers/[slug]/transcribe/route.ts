@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import * as bloggerService from "@/services/douyin/blogger-service";
 import { startTranscribeBloggerWorks } from "@/services/douyin/pipeline-service";
 import { requireAdmin } from "@/lib/admin-auth";
+import { jsonError } from "@/lib/api-error";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const denied = requireAdmin(req);
@@ -17,9 +18,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     const result = startTranscribeBloggerWorks(blogger.id);
     return Response.json({ success: true, ...result });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "转写失败" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "转写失败" });
   }
 }

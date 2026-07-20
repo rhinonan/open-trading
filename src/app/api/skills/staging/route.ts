@@ -1,14 +1,12 @@
 // src/app/api/skills/staging/route.ts
 import * as skillService from "@/services/skills-service";
+import { jsonError } from "@/lib/api-error";
 
 export async function GET() {
   try {
     const staging = skillService.listStaging();
     return Response.json({ success: true, staging });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "获取暂存列表失败" },
-      { status: 500 },
-    );
+    return jsonError(err, { status: 500, body: "success-false", fallback: "获取暂存列表失败" });
   }
 }

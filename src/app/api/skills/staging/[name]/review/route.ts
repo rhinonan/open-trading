@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { mastra } from "@/mastra";
 import { requireAdmin } from "@/lib/admin-auth";
 import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
+import { jsonError } from "@/lib/api-error";
 
 export async function POST(
   req: NextRequest,
@@ -48,9 +49,6 @@ export async function POST(
       workflowId: "skillReviewWorkflow",
       error: err,
     });
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "审查失败" },
-      { status: 500 },
-    );
+    return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "审查失败", log: false });
   }
 }

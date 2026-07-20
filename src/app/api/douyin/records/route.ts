@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { predictionItems, works, bloggers } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import type { PredictionItem } from "@/types";
+import { jsonError } from "@/lib/api-error";
 
 /** GET /api/douyin/records?blogger_slug=xxx&workId=xxx */
 export async function GET(request: NextRequest) {
@@ -57,9 +58,6 @@ export async function GET(request: NextRequest) {
     items = db.select().from(predictionItems).all();
     return Response.json({ success: true, items });
   } catch (err) {
-    return Response.json(
-      { success: false, error: err instanceof Error ? err.message : "Internal error" },
-      { status: 500 }
-    );
+    return jsonError(err, { request: request, status: 500, body: "success-false", fallback: "Internal error" });
   }
 }
