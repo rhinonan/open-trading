@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     "@mastra/*",
     "@mastra/core",
     "@mastra/libsql",
+    "@mastra/loggers",
     "@mastra/observability",
   ],
 };

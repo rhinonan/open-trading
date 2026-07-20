@@ -8,6 +8,7 @@ import { downloadVideo } from "@/services/douyin/video-downloader";
 import { extractAudio } from "@/services/douyin/audio-extractor";
 import { transcribeAudio } from "@/services/douyin/transcriber";
 import { extractOpinion } from "@/services/douyin/opinion-service";
+import { llmLog } from "@/lib/llm-log";
 
 // 单作品转写工作流输入
 const workflowInputSchema = z.object({
@@ -20,17 +21,32 @@ const workflowInputSchema = z.object({
 
 type WorkflowInput = z.infer<typeof workflowInputSchema>;
 
+const WORKFLOW_ID = "transcribe-work";
+
 // 1. 下载视频
 const downloadStep = createStep({
   id: "download-video",
   inputSchema: workflowInputSchema,
   outputSchema: z.object({ videoPath: z.string() }),
   retries: 2,
-  execute: async ({ inputData }) => {
-    const { awemeId, videoUrl } = inputData;
-    console.log(`[${awemeId}] 开始下载视频...`);
+  execute: async ({ inputData, mastra }) => {
+    const { workId, awemeId, videoUrl } = inputData;
+    const logger = mastra.getLogger();
+    logger.info("download-video start", { workflowId: WORKFLOW_ID, workId, awemeId });
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: WORKFLOW_ID,
+      stepId: "download-video",
+      workId,
+      awemeId,
+    });
     const videoPath = await downloadVideo(awemeId, videoUrl);
-    console.log(`[${awemeId}] 视频下载完成 → ${videoPath}`);
+    logger.info("download-video done", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      videoPath,
+    });
     return { videoPath };
   },
 });
@@ -41,11 +57,24 @@ const extractAudioStep = createStep({
   inputSchema: z.object({ videoPath: z.string() }),
   outputSchema: z.object({ audioPath: z.string() }),
   retries: 2,
-  execute: async ({ inputData, getInitData }) => {
-    const { awemeId } = getInitData<WorkflowInput>();
-    console.log(`[${awemeId}] 开始提取音频...`);
+  execute: async ({ inputData, getInitData, mastra }) => {
+    const { workId, awemeId } = getInitData<WorkflowInput>();
+    const logger = mastra.getLogger();
+    logger.info("extract-audio start", { workflowId: WORKFLOW_ID, workId, awemeId });
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: WORKFLOW_ID,
+      stepId: "extract-audio",
+      workId,
+      awemeId,
+    });
     const audioPath = await extractAudio(inputData.videoPath, awemeId);
-    console.log(`[${awemeId}] 音频提取完成 → ${audioPath}`);
+    logger.info("extract-audio done", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      audioPath,
+    });
     return { audioPath };
   },
 });
@@ -56,14 +85,35 @@ const transcribeStep = createStep({
   inputSchema: z.object({ audioPath: z.string() }),
   outputSchema: z.object({ transcript: z.string() }),
   retries: 2,
-  execute: async ({ inputData, getInitData }) => {
-    const { awemeId, duration } = getInitData<WorkflowInput>();
+  execute: async ({ inputData, getInitData, mastra }) => {
+    const { workId, awemeId, duration } = getInitData<WorkflowInput>();
     // duration=0 表示未知 — 按长音频（LFASR）兜底
     const effectiveDuration = duration > 0 ? duration : 61_000;
-    const method = effectiveDuration / 1000 <= 60 ? "IAT (短音频)" : "LFASR (长音频)";
-    console.log(`[${awemeId}] 开始语音转写 (${method}, duration=${effectiveDuration}ms)...`);
+    const method = effectiveDuration / 1000 <= 60 ? "IAT" : "LFASR";
+    const logger = mastra.getLogger();
+    logger.info("transcribe-audio start", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      method,
+      durationMs: effectiveDuration,
+    });
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: WORKFLOW_ID,
+      stepId: "transcribe-audio",
+      workId,
+      awemeId,
+      method,
+      durationMs: effectiveDuration,
+    });
     const transcript = await transcribeAudio(inputData.audioPath, effectiveDuration);
-    console.log(`[${awemeId}] 语音转写完成 → ${transcript.length} 字符`);
+    logger.info("transcribe-audio done", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      transcriptChars: transcript.length,
+    });
     return { transcript };
   },
 });
@@ -77,21 +127,43 @@ const opinionAndSaveStep = createStep({
     opinionSummary: z.string(),
   }),
   retries: 2,
-  execute: async ({ inputData, getInitData }) => {
+  execute: async ({ inputData, getInitData, mastra }) => {
     const { workId, awemeId, desc } = getInitData<WorkflowInput>();
-    console.log(`[${awemeId}] 开始提取观点摘要...`);
+    const logger = mastra.getLogger();
+    logger.info("opinion-and-save start", { workflowId: WORKFLOW_ID, workId, awemeId });
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: WORKFLOW_ID,
+      stepId: "opinion-and-save",
+      workId,
+      awemeId,
+    });
     // extractOpinion 内部已捕获所有异常并返回 ""（非致命）
     const opinionSummary = await extractOpinion(inputData.transcript, desc);
-    console.log(`[${awemeId}] 观点摘要 → ${opinionSummary.slice(0, 50)}...`);
 
-    db.update(works)
+    await db
+      .update(works)
       .set({
         transcript: inputData.transcript,
         transcriptStatus: "done",
         opinionSummary,
       })
-      .where(eq(works.id, workId))
-      .run();
+      .where(eq(works.id, workId));
+
+    logger.info("opinion-and-save done", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      opinionChars: opinionSummary.length,
+    });
+    llmLog("info", {
+      event: "workflow.step.success",
+      workflowId: WORKFLOW_ID,
+      stepId: "opinion-and-save",
+      workId,
+      awemeId,
+      status: "success",
+    });
 
     return { transcript: inputData.transcript, opinionSummary };
   },

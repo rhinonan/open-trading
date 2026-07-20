@@ -141,17 +141,18 @@ Mastra storage：data/mastra.db（run 快照）
 
 ### 5.3 可观测性不足
 
-- 主通道：`console.log` / `console.error`
-- 缺：token、cost、latency、model id、统一 `runId`↔`workId`
+- ~~主通道：`console.log` / `console.error`~~ → 2026-07-20：`PinoLogger` + step `mastra.getLogger()` + 业务 `llm-log`；span 侧 `SensitiveDataFilter`
+- 仍缺：token、cost 聚合（metrics 需 DuckDB/ClickHouse）；统一运维面
 - runs API 目前偏转写 workflow，未形成全 workflow 运维面
 
 ### 5.4 Tools 弱、Sandbox 重
 
-evaluator 依赖 skills + `LocalSandbox` + prompt 约定数据源。  
+~~evaluator 依赖 skills + `LocalSandbox` + prompt 约定数据源。~~  
+2026-07-20：首批 Typed Tools 已挂上，联调确认**优先 call tools**；仍会回退 skill + `execute_command`（mootdx 等），structuredOutput 收束失败见 P1-1。  
 更稳分层：
 
 ```text
-Typed Tools（zod、可单测、可限流）  ← 优先
+Typed Tools（zod、可单测、可限流）  ← 优先（已做 getStockQuote / getIndexKline / getSectorRank）
     ↑
 Skills（操作说明 / 少量脚本）
     ↑
@@ -267,13 +268,14 @@ runner 可注入；agent/workflow 几乎靠手工冒烟。缺 mock model、schem
 
 #### P1-1 行情 Typed Tools
 
-- [ ] 将 evaluator 高频数据能力收成 tools（示例）：`getIndexKline`、`getStockQuote`、`getSectorRank`  
-- [ ] zod 入参/出参；内部复用限流（东财 em_get 等）  
-- [ ] agent instructions 改为「优先 call tools」，skills 降为说明文档  
-- [ ] 单测：tool 入参校验 + mock HTTP  
-- [ ] 验证：同作品评判 evidence 来自 tool 结果而非随意脚本 stdout  
+- [x] 将 evaluator 高频数据能力收成 tools：`getIndexKline`、`getStockQuote`、`getSectorRank`（2026-07-20）  
+- [x] zod 入参/出参；解析与 HTTP 分层（`src/lib/market/*` + `src/mastra/tools/market-tools.ts`）  
+- [x] agent instructions 改为「优先 call tools」，skills/sandbox 作长尾后备  
+- [x] 单测：纯解析 + mock fetch 的 tool execute  
+- [x] 联调（work `id=3`，`scripts/run-eval-once.ts`，2026-07-20）：**优先调用 Typed Tools**（`getIndexKline`×8、`getStockQuote`×3 先于 skill/sandbox）；`getSectorRank` 本次未触发（内容偏大盘点位，合理）  
+- [ ] 整次 evaluate 仍失败：`Structured output validation failed: expected object, received undefined` → 未落 `prediction_items`。下一步应修 **structured output 收束**（与 P1-4 `maxSteps` / tool+JSON 拆分相关），而非再加 tool  
 
-**主要文件**：`src/mastra/tools/**`、`evaluator-agent.ts`、skills 内容可能收缩。
+**主要文件**：`src/lib/market/**`、`src/mastra/tools/market-tools.ts`、`evaluator-agent.ts`、`scripts/run-eval-once.ts`。
 
 #### P1-2 收紧 Sandbox
 
@@ -382,14 +384,14 @@ P0-5 命名合同（极小）
 | ID | 项 | 状态 | 完成日期 | PR/Commit | 备注 |
 |----|----|------|----------|-----------|------|
 | P0-1 | 统一 Agent 调用 | [x] | 2026-07-19 | style/intelligence-console | `getRegisteredAgent` |
-| P0-2 | 可观测最小集 | [x] | 2026-07-19 | style/intelligence-console | `llm-log`；Langfuse 仍可选 |
+| P0-2 | 可观测最小集 | [x] | 2026-07-19 | style/intelligence-console | `llm-log`；2026-07-20 补 `PinoLogger` + `SensitiveDataFilter`；Langfuse 仍可选 |
 | P0-3 | 收紧 structured schema | [x] | 2026-07-19 | style/intelligence-console | `evidenceSchema` |
 | P0-4 | 写操作鉴权 | [x] | 2026-07-19 | style/intelligence-console | `ADMIN_TOKEN` |
 | P0-5 | 命名合同 | [x] | 2026-07-19 | style/intelligence-console | `AGENT_KEYS` + 单测 |
-| P1-1 | 行情 Typed Tools | [ ] | | | |
-| P1-2 | Sandbox 收紧 | [ ] | | | |
+| P1-1 | 行情 Typed Tools | [x] | 2026-07-20 | | 首批 3 tools；联调确认优先 call tools；structuredOutput 收束失败另跟 |
+| P1-2 | Sandbox 收紧 | [ ] | | | 联调仍见 skill+execute_command 回退，可与 SO 修复后一并收紧 |
 | P1-3 | 金标 Eval 集 | [ ] | | | |
-| P1-4 | 成本/步数治理 | [ ] | | | |
+| P1-4 | 成本/步数治理 | [ ] | | | 建议与 evaluate structuredOutput 收束一起做（maxSteps 被 tool loop 吃满） |
 | P1-5 | Workflow 幂等 | [ ] | | | |
 | P1-6 | Runs 运维面统一 | [ ] | | | |
 | P2-1 | 外部队列 | [ ] | | | |

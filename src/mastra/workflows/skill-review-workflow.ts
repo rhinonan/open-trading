@@ -109,9 +109,10 @@ const reviewStep = createStep({
     const fullPrompt = `${prompt}\n\n请对以上批次 "${batchId}" 中的所有 Skill 进行安全审查，严格按照 JSON schema 输出审查结果。`;
 
     const agent = await getRegisteredAgent("skillReviewerAgent");
+    // newapi 上 deepseek 等模型不支持 response_format: json_schema。
+    // @mastra/core@1.51 的 jsonPromptInjection 仅 boolean|'system'|'inline'（无 'auto'），
+    // 必须 prompt 注入，否则会报 "This response_format type is unavailable now"。
     const result = await agent.generate(fullPrompt, {
-      // newapi 上部分模型（如 deepseek-v4-pro）不支持原生 response_format，
-      // 用 prompt 注入强制 JSON，避免 "This response_format type is unavailable now"。
       structuredOutput: {
         schema: reviewOutputSchema,
         jsonPromptInjection: true,

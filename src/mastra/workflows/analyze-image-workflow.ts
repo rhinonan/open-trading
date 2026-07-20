@@ -6,6 +6,7 @@ import { works } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { downloadImages } from "@/services/douyin/image-downloader";
 import { extractOpinionFromImages } from "@/services/douyin/opinion-service";
+import { llmLog } from "@/lib/llm-log";
 
 const workflowInputSchema = z.object({
   workId: z.number(),
@@ -16,17 +17,39 @@ const workflowInputSchema = z.object({
 
 type WorkflowInput = z.infer<typeof workflowInputSchema>;
 
+const WORKFLOW_ID = "analyze-image-work";
+
 // Step 1: 下载图片到本地
 const downloadStep = createStep({
   id: "download-images",
   inputSchema: workflowInputSchema,
   outputSchema: z.object({ imagePaths: z.array(z.string()) }),
   retries: 2,
-  execute: async ({ inputData }) => {
-    const { awemeId, imageUrls } = inputData;
-    console.log(`[${awemeId}] 开始下载图集 (${imageUrls.length} 张)...`);
+  execute: async ({ inputData, mastra }) => {
+    const { workId, awemeId, imageUrls } = inputData;
+    const logger = mastra.getLogger();
+    logger.info("download-images start", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      imageCount: imageUrls.length,
+    });
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: WORKFLOW_ID,
+      stepId: "download-images",
+      workId,
+      awemeId,
+      imageCount: imageUrls.length,
+    });
     const imagePaths = await downloadImages(awemeId, imageUrls);
-    console.log(`[${awemeId}] 图片下载完成 → ${imagePaths.length}/${imageUrls.length} 张`);
+    logger.info("download-images done", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      downloaded: imagePaths.length,
+      requested: imageUrls.length,
+    });
     return { imagePaths };
   },
 });
@@ -37,20 +60,50 @@ const analyzeAndSaveStep = createStep({
   inputSchema: z.object({ imagePaths: z.array(z.string()) }),
   outputSchema: z.object({ opinionSummary: z.string() }),
   retries: 2,
-  execute: async ({ inputData, getInitData }) => {
+  execute: async ({ inputData, getInitData, mastra }) => {
     const { workId, awemeId, desc } = getInitData<WorkflowInput>();
-    console.log(`[${awemeId}] 开始图集观点分析...`);
-    const opinionSummary = await extractOpinionFromImages(desc, inputData.imagePaths);
-    console.log(`[${awemeId}] 图集观点 → ${opinionSummary.slice(0, 50)}...`);
+    const logger = mastra.getLogger();
+    logger.info("analyze-and-save start", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      imageCount: inputData.imagePaths.length,
+    });
+    llmLog("info", {
+      event: "workflow.step.start",
+      workflowId: WORKFLOW_ID,
+      stepId: "analyze-and-save",
+      workId,
+      awemeId,
+    });
+    const opinionSummary = await extractOpinionFromImages(
+      desc,
+      inputData.imagePaths,
+    );
 
-    await db.update(works)
+    await db
+      .update(works)
       .set({
         transcript: null, // 图集无转写
         transcriptStatus: "done",
         opinionSummary,
       })
-      .where(eq(works.id, workId))
-      .run();
+      .where(eq(works.id, workId));
+
+    logger.info("analyze-and-save done", {
+      workflowId: WORKFLOW_ID,
+      workId,
+      awemeId,
+      opinionChars: opinionSummary.length,
+    });
+    llmLog("info", {
+      event: "workflow.step.success",
+      workflowId: WORKFLOW_ID,
+      stepId: "analyze-and-save",
+      workId,
+      awemeId,
+      status: "success",
+    });
 
     return { opinionSummary };
   },

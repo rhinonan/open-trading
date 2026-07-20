@@ -79,8 +79,14 @@ const prepareStep = createStep({
   id: "eval-prepare",
   inputSchema: workflowInputSchema,
   outputSchema: workflowInputSchema.extend({ bloggerNickname: z.string() }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, mastra }) => {
     const { workId, awemeId } = inputData;
+    const logger = mastra.getLogger();
+    logger.info("eval-prepare start", {
+      workflowId: "evaluate-work",
+      workId,
+      awemeId,
+    });
     llmLog("info", {
       event: "workflow.step.start",
       workflowId: "evaluate-work",
@@ -89,7 +95,7 @@ const prepareStep = createStep({
       awemeId,
     });
 
-    const blogger = db
+    const blogger = await db
       .select({ nickname: bloggers.nickname })
       .from(bloggers)
       .where(eq(bloggers.id, inputData.bloggerId))
@@ -140,8 +146,10 @@ const judgeStep = createStep({
     });
 
     const agent = await getRegisteredAgent("evaluatorAgent");
+    // newapi 上 deepseek 等模型不支持 response_format: json_schema。
+    // @mastra/core@1.51 的 jsonPromptInjection 仅 boolean|'system'|'inline'（无 'auto'），
+    // 评判链路必须走 prompt 注入，否则 structuredOutput 会空/失败。
     const result = await agent.generate(prompt, {
-      // newapi 上部分模型不支持原生 response_format，改用 prompt 注入强制 JSON。
       structuredOutput: {
         schema: predictionsSchema,
         jsonPromptInjection: true,
