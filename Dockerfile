@@ -19,21 +19,27 @@ RUN pnpm run build
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=3003
+ENV PORT=3002
+ENV HOSTNAME=0.0.0.0
 
-# Native build tools required by better-sqlite3 at install time
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Native build tools for better-sqlite3; ffmpeg for ASR audio extract
+RUN apt-get update && apt-get install -y \
+    python3 make g++ \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies only
+# 生产依赖 + drizzle-kit/typescript（entrypoint 用 push 同步 schema，需能加载 schema.ts）
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod && pnpm store prune
+RUN pnpm install --frozen-lockfile --prod \
+    && pnpm add drizzle-kit@0.31.10 typescript@5 --save-prod --no-lockfile \
+    && pnpm store prune
 
 # Retain python3 for Mastra skill sandbox execution
 RUN apt-get update && apt-get install -y python3-pip && \
     pip3 install --no-cache-dir --break-system-packages mootdx requests pandas stockstats && \
     rm -rf /var/lib/apt/lists/*
 
-# Clean up build tools (NOT python3 — skill sandbox needs it)
+# Clean up build tools (NOT python3 / ffmpeg — runtime needs them)
 RUN apt-get purge -y make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Copy build output and static assets
@@ -41,10 +47,17 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./
 
-# Data directory for SQLite
+# Schema push 需要：drizzle 配置、迁移元数据、schema 源文件
+COPY drizzle.config.ts ./
+COPY drizzle ./drizzle
+COPY src/db ./src/db
+COPY scripts/docker-entrypoint.mjs ./scripts/docker-entrypoint.mjs
+
+# Data directory for SQLite / media / cache
 RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
-EXPOSE 3003
+EXPOSE 3002
 
-CMD ["pnpm", "exec", "next", "start"]
+ENTRYPOINT ["node", "scripts/docker-entrypoint.mjs"]
+CMD ["pnpm", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3002"]

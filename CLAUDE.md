@@ -9,15 +9,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 包管理器固定为 **pnpm**（见 `packageManager` 字段；勿再用 npm/yarn 装依赖）。
 
 - `pnpm setup` — **新 clone 一键准备**：检查 Node、无 `.env` 时从 example 复制、创建 `data/`（或 `DATA_ROOT`）、`drizzle-kit push`
-- `pnpm dev` — 启动开发服务器（http://localhost:3000）
-- `pnpm build` / `pnpm start` — 生产构建 / 启动
+- `pnpm dev` — 启动开发服务器（http://localhost:3002）
+- `pnpm build` / `pnpm start` — 生产构建 / 启动（:3002，start 监听 0.0.0.0）
 - `pnpm lint` — ESLint
 - `pnpm test` — vitest 单测（内存 SQLite 上跑队列/runner 逻辑）
 - `pnpm db:generate` — 根据 `src/db/schema.ts` 生成迁移 SQL 到 `drizzle/`
 - `pnpm db:push` — 将 schema 直接推送到 `data/douyin.db`
 - `pnpm db:studio` — Drizzle Studio
 - `pnpm exec tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
-- Docker 部署：`docker compose up -d`（端口 3003，挂载 `./data`）
+- Docker 部署：`docker compose up -d --build`（端口 **3002**，挂载 `./data`；入口脚本会 `drizzle-kit push --force`）
 
 Node >= 22.13.0。新环境推荐：`corepack enable` → `pnpm install` → `pnpm setup` → 编辑 `.env` 填密钥（TikHub、newapi、讯飞 ASR）→ `pnpm dev`。  
 运行时 `ensureDataRoot()` 会自动创建数据目录；空库表结构仍需 `setup` / `db:push` 写入。

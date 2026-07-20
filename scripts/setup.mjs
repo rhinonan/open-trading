@@ -73,9 +73,10 @@ mkdirSync(dataRoot, { recursive: true });
 log(`数据目录就绪: ${dataRoot}`);
 
 // --- schema ---
-log("推送业务库 schema (drizzle-kit push)…");
+log("推送业务库 schema (drizzle-kit push --force)…");
+// --force：非交互环境（CI/无 TTY）也能自动确认；本机有确认风险的大改仍应先看 generate 的 SQL
 // Windows 下 npx/cmd 需要 shell；把整条命令当单字符串传入，避免 DEP0190
-const push = spawnSync("npx drizzle-kit push", {
+const push = spawnSync("npx drizzle-kit push --force", {
   cwd: root,
   stdio: "inherit",
   shell: true,
