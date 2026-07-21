@@ -54,7 +54,7 @@ API 有全局与单博主两套入口：`/api/douyin/{scan,transcribe,evaluate}`
 - API 路由错误：统一 `jsonError` / `logApiError`（`src/lib/api-error.ts`），catch 后写 stdout 一行 JSON（含 method/path/stack），再返回 `{ error }`；未 catch 的请求错误见 `src/instrumentation.ts` 的 `onRequestError`。
 - Agent 调用日志 UI：`@mastra/observability` + `MastraStorageExporter` 写 `mastra.db`/`mastra_ai_spans`；页面 `/agents/logs`，API `/api/agents/logs`（列表 root `AGENT_RUN`）与 `/api/agents/logs/[traceId]`（详情）。与业务 `llm-log`、workflow snapshot `/api/agents/runs` 分层，勿混用。
 - 聊天走 `/api/chat?agentKey=<key>`，用 `@mastra/ai-sdk` 的 `handleChatStream` 流式输出；前端在 `src/components/agents` + ai-elements / streamdown。
-- 写操作鉴权：`src/lib/admin-auth.ts`。未设 `ADMIN_TOKEN` 时放行；设置后写接口需 `Authorization: Bearer …` 或 `x-admin-token`。
+- 写操作 / 设置页鉴权：`src/lib/admin-auth.ts` + `src/lib/admin-session.ts`。未设 `ADMIN_TOKEN` 时放行；设置后写接口需 Bearer / `x-admin-token` **或** 有效 `ot_session`（`/login` 用同一 token 登录，无注册）。`settings/layout` 服务端门禁 `/settings/*`。
 - `next.config.ts` 的 `serverExternalPackages` 排除了 `@mastra/*`（Node-only 依赖），新增此类依赖时照做。
 
 ### 其他

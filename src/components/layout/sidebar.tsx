@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useMobile } from "@/hooks/use-mobile";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import {
   SIDEBAR_WIDTH_COLLAPSED,
   SIDEBAR_WIDTH_EXPANDED,
@@ -70,8 +71,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
-
 function NavLink({
   item,
   collapsed,
@@ -118,11 +117,26 @@ export function Sidebar() {
   const pathname = usePathname();
   const isMobile = useMobile();
   const { collapsed, toggle } = useSidebar();
+  const { me, loading } = useAuth();
+
+  // 鉴权启用且未登录时隐藏「设置」；加载完成前不藏，避免本机无 token 时闪一下
+  const hideSettings = !loading && me.authRequired && !me.authenticated;
+
+  const navGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => !(hideSettings && item.href === "/settings"),
+    ),
+  })).filter((group) => group.items.length > 0);
+
+  const visibleItems = navGroups.flatMap((g) => g.items);
 
   // 最长前缀匹配：/agents/logs 不会同时高亮 /agents
-  const matchingItem = ALL_NAV_ITEMS.filter(
-    (it) => pathname === it.href || pathname.startsWith(it.href + "/")
-  ).sort((a, b) => b.href.length - a.href.length)[0];
+  const matchingItem = visibleItems
+    .filter(
+      (it) => pathname === it.href || pathname.startsWith(it.href + "/"),
+    )
+    .sort((a, b) => b.href.length - a.href.length)[0];
 
   const sidebarContent = (
     <div
@@ -150,7 +164,7 @@ export function Sidebar() {
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="flex flex-col gap-4">
           <TooltipProvider delay={0}>
-            {NAV_GROUPS.map((group) => (
+            {navGroups.map((group) => (
               <div key={group.label} className="flex flex-col gap-1">
                 {!collapsed && (
                   <p className="px-3 mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

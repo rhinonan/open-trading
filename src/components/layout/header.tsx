@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { useAuth } from "@/hooks/use-auth";
+import { LogIn, LogOut } from "lucide-react";
 
 const GITHUB_URL = "https://github.com/rhinonan/open-trading";
 
@@ -29,6 +31,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/settings": "设置",
   "/settings/douyin": "抖音雷达",
   "/settings/skills": "Skills",
+  "/login": "登录",
 };
 
 function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
@@ -47,7 +50,14 @@ function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const breadcrumbs = getBreadcrumbs(pathname);
+  const { me, loading, logout } = useAuth();
+
+  async function onLogout() {
+    await logout();
+    router.refresh();
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
@@ -73,8 +83,31 @@ export function Header() {
         })}
       </nav>
 
-      {/* Right side: GitHub 仓库入口 + theme toggle */}
+      {/* Right side: auth + GitHub + theme */}
       <div className="flex items-center gap-2">
+        {!loading && me.authRequired && (
+          me.authenticated ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5 text-muted-foreground"
+              onClick={() => void onLogout()}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">退出</span>
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5"
+              render={<Link href={`/login?next=${encodeURIComponent(pathname || "/settings")}`} />}
+            >
+              <LogIn className="h-4 w-4" />
+              <span className="hidden sm:inline">登录</span>
+            </Button>
+          )
+        )}
         <Button
           variant="ghost"
           size="icon"

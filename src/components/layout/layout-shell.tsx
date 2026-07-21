@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useMobile } from "@/hooks/use-mobile";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -10,8 +11,18 @@ import {
 } from "@/components/layout/sidebar-width";
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { collapsed } = useSidebar();
   const isMobile = useMobile();
+  const bare = pathname === "/login" || pathname.startsWith("/login/");
+
+  if (bare) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <main className="flex-1">{children}</main>
+      </div>
+    );
+  }
 
   if (isMobile) {
     return (

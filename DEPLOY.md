@@ -42,7 +42,8 @@ cp .env.example .env
 
 | 变量 | 建议 |
 |------|------|
-| `ADMIN_TOKEN` | 设成长随机串。设置后写接口需 `Authorization: Bearer …` 或 `x-admin-token`。未设则写操作全放行 |
+| `ADMIN_TOKEN` | 设成长随机串。写接口需 Bearer / `x-admin-token`，**或** 浏览器在 `/login` 用同一令牌登录后的会话 cookie。同时锁定 `/settings/*`（侧栏隐藏设置，无注册）。未设则写操作与设置页全放行 |
+| `SESSION_SECRET` | 可选。会话 HMAC 密钥；不设则用 `ADMIN_TOKEN` 签名 |
 | `DOUYIN_CACHE_MODE` | 保持 **`false`**（示例默认）。`true` 只适合本机省配额回放，会冻住扫描缓存 |
 | `DOUYIN_SCAN_CUTOFF_DATE` | 扫描最早发布日 `YYYY-MM-DD`，按业务改 |
 | `VIDEO_RETENTION_DAYS` | 仅 `scripts/cleanup.ts` 用；容器内需自行定时跑清理时再关注 |
@@ -121,7 +122,7 @@ docker compose exec open-trading bash
 
 - 云安全组 / ufw 放行 **TCP 3002**，或只对内网开放 3002，前面用 Nginx/Caddy 反代 443。  
 - 反代时注意 WebSocket / 流式聊天（`/api/chat`）需要支持流式响应与较长超时。  
-- 若公网暴露写接口，务必配置 `ADMIN_TOKEN`，并由网关或可信客户端带上鉴权头。
+- 若公网暴露写接口或设置页，务必配置 `ADMIN_TOKEN`。脚本/API 带鉴权头；浏览器走 `/login`（无注册）。可选 `SESSION_SECRET` 单独签会话。
 
 示例（Nginx 片段，按需改域名与证书）：
 
@@ -154,7 +155,8 @@ location / {
 | API 500 但页面只显示失败 | 看容器/进程 stdout：应有一行 JSON，`event":"api.error"`，含 `path`/`message`/`stack`。`docker compose logs -f open-trading` |
 | 扫描没有新作品 | 确认 `DOUYIN_CACHE_MODE=false`；必要时清空或忽略 `data/api-cache` |
 | 转写失败 `ffmpeg spawn failed` | 镜像应自带 ffmpeg；确认用的是本仓库 Dockerfile 构建的镜像 |
-| 写接口 401 | 已设 `ADMIN_TOKEN`，请求需带 Bearer / `x-admin-token` |
+| 写接口 401 | 已设 `ADMIN_TOKEN`：脚本/API 带 Bearer 或 `x-admin-token`；浏览器先打开 `/login` 用同一令牌登录（会话 cookie 亦可通过 requireAdmin） |
+| 设置页跳登录 | 已设 `ADMIN_TOKEN` 且未登录属预期；登录后可进 `/settings/*`，侧栏才会显示「设置」 |
 | LLM / ASR 失败 | 检查 `NEWAPI_*`、`ASR_*` 与网关/讯飞控制台配额 |
 | 磁盘涨 | `data/videos`、`data/audio`、`data/api-cache`；按需跑清理或关缓存模式 |
 

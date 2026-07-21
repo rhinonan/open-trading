@@ -4,13 +4,21 @@ import {
   requireAdmin,
   isAdminAuthEnabled,
   extractAdminToken,
+  verifyAdminToken,
 } from "@/lib/admin-auth";
+import {
+  sealAdminSession,
+  ADMIN_SESSION_COOKIE,
+} from "@/lib/admin-session";
 
 const ORIGINAL = process.env.ADMIN_TOKEN;
+const ORIGINAL_SECRET = process.env.SESSION_SECRET;
 
 afterEach(() => {
   if (ORIGINAL === undefined) delete process.env.ADMIN_TOKEN;
   else process.env.ADMIN_TOKEN = ORIGINAL;
+  if (ORIGINAL_SECRET === undefined) delete process.env.SESSION_SECRET;
+  else process.env.SESSION_SECRET = ORIGINAL_SECRET;
 });
 
 function req(headers: Record<string, string> = {}): Request {
@@ -52,9 +60,31 @@ describe("admin-auth", () => {
     expect(res?.status).toBe(401);
   });
 
+  it("有效 session cookie → 放行", () => {
+    process.env.ADMIN_TOKEN = "secret-token";
+    delete process.env.SESSION_SECRET;
+    const session = sealAdminSession()!;
+    expect(
+      requireAdmin(req({ cookie: `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(session)}` })),
+    ).toBeNull();
+  });
+
+  it("无效 session cookie → 401", () => {
+    process.env.ADMIN_TOKEN = "secret-token";
+    const res = requireAdmin(req({ cookie: `${ADMIN_SESSION_COOKIE}=garbage` }));
+    expect(res?.status).toBe(401);
+  });
+
   it("extractAdminToken 解析 Bearer 与自定义头", () => {
     expect(extractAdminToken(req({ Authorization: "Bearer abc" }))).toBe("abc");
     expect(extractAdminToken(req({ "x-admin-token": "xyz" }))).toBe("xyz");
     expect(extractAdminToken(req())).toBeUndefined();
+  });
+
+  it("verifyAdminToken 常量时间比较", () => {
+    process.env.ADMIN_TOKEN = "secret-token";
+    expect(verifyAdminToken("secret-token")).toBe(true);
+    expect(verifyAdminToken("wrong")).toBe(false);
+    expect(verifyAdminToken(undefined)).toBe(false);
   });
 });

@@ -1,43 +1,33 @@
-"use client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { isAdminAuthEnabled } from "@/lib/admin-auth";
+import {
+  ADMIN_SESSION_COOKIE,
+  verifyAdminSessionToken,
+} from "@/lib/admin-session";
+import { SettingsTabs } from "./settings-tabs";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-
-const TABS = [
-  { label: "基础设置", href: "/settings" },
-  { label: "抖音雷达", href: "/settings/douyin" },
-  { label: "调度", href: "/settings/schedule" },
-  { label: "Skills", href: "/settings/skills" },
-];
-
-export default function SettingsLayout({
+/**
+ * 设置区服务端门禁。
+ * 未设 ADMIN_TOKEN 时放行，与写 API / requireAdmin 一致。
+ * 深链 next 在客户端被挡时只能落到 /settings；登录后进设置根即可。
+ */
+export default async function SettingsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  if (isAdminAuthEnabled()) {
+    const jar = await cookies();
+    const raw = jar.get(ADMIN_SESSION_COOKIE)?.value;
+    if (!verifyAdminSessionToken(raw)) {
+      redirect("/login?next=%2Fsettings");
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {/* 页签导航 */}
-      <div className="flex gap-1 border-b">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={cn(
-              "px-4 py-2 text-sm -mb-px border-b-2 transition-colors",
-              pathname === tab.href
-                ? "border-primary text-foreground font-medium"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </div>
-
+      <SettingsTabs />
       {children}
     </div>
   );
