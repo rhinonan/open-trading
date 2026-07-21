@@ -44,5 +44,8 @@ next-env.d.ts
 # runtime data (database, cache, media files)
 /data/
 
+# npm lock file (project uses pnpm)
+package-lock.json
+
 # claude code - personal settings
 .claude/settings.local.json

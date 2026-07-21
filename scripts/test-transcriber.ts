@@ -1,12 +1,8 @@
 // scripts/test-transcriber.ts
 // 测试讯飞 LFASR 语音转写 API 修复
 
-import * as dotenv from "dotenv";
 import * as path from "path";
 import * as fs from "fs";
-
-// 加载 .env（必须在 import transcriber 之前）
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
 async function main() {
   const audioDir = path.resolve(__dirname, "..", "data", "audio");

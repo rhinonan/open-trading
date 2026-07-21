@@ -1,13 +1,6 @@
 // scripts/run-eval-once.ts
 // 一次性：对指定 work 跑 evaluate-work workflow，打印结果与 agent tool 调用摘要。
 // 用法：pnpm exec tsx scripts/run-eval-once.ts [workId]
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
-
 import { mastra } from "@/mastra";
 import { db } from "@/db";
 import { works, predictionItems } from "@/db/schema";

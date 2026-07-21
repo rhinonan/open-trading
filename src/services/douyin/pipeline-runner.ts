@@ -13,8 +13,8 @@ import {
 import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 
 const CONCURRENCY = 2;
-const TRANSCRIBE_WORKFLOW_ID = "transcribeWorkWorkflow";
-const ANALYZE_IMAGE_WORKFLOW_ID = "analyzeImageWorkflow";
+const TRANSCRIBE_WORKFLOW_ID = "transcribeWorkWorkflow" as const;
+const ANALYZE_IMAGE_WORKFLOW_ID = "analyzeImageWorkflow" as const;
 
 export interface Runner {
   kick(): void;
@@ -105,7 +105,7 @@ async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
   const { id, awemeId, videoUrl, duration, desc, mediaType, imageUrls } = work;
   const timer = startTimer();
   let runId: string | undefined;
-  let workflowId = TRANSCRIBE_WORKFLOW_ID;
+  let workflowId: typeof TRANSCRIBE_WORKFLOW_ID | typeof ANALYZE_IMAGE_WORKFLOW_ID = TRANSCRIBE_WORKFLOW_ID;
   try {
     if (mediaType === 4) {
       // 视频：走现有转写 workflow；缺下载地址视为失败（而非误入图集分支）

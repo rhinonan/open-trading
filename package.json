@@ -12,7 +12,6 @@
     "dev": "next dev -p 3002",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3002",
-
     "lint": "eslint",
     "test": "vitest run",
     "setup": "node scripts/setup.mjs",
@@ -67,5 +66,13 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }
