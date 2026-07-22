@@ -1,6 +1,9 @@
+# 生产 / 服务器：只拉取预构建镜像，不在弱机上 --build。
+# 镜像由 GitHub Actions 推到 GHCR（见 .github/workflows/docker-publish.yml）。
+# 本地开发请用 pnpm dev；应急本机构建见 DEPLOY.md「可选：本机构建」。
 services:
   open-trading:
-    build: .
+    image: ghcr.io/rhinonan/open-trading:latest
     container_name: open-trading
     ports:
       - "3002:3002"
@@ -16,3 +19,4 @@ services:
     mem_limit: 2g
     cpus: 2
     restart: unless-stopped
+    pull_policy: always
