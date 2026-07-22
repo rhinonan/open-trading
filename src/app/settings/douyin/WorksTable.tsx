@@ -237,8 +237,7 @@ export function WorksTable({
                   aria-label="全选本页"
                 />
               </th>
-              <th className="text-left font-medium py-2 pl-2 w-10">封面</th>
-              <th className="text-left font-medium py-2">描述</th>
+              <th className="text-left font-medium py-2 pl-2">描述</th>
               <th className="text-left font-medium py-2 w-16">类型</th>
               <th className="text-left font-medium py-2 w-16">时长</th>
               <th className="text-left font-medium py-2 w-20">转写</th>
@@ -251,7 +250,7 @@ export function WorksTable({
             {loading && !data ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 8 }).map((_, j) => (
                     <td key={j} className="py-2 px-2">
                       <Skeleton className="h-8 w-full" />
                     </td>
@@ -279,7 +278,7 @@ export function WorksTable({
             ) : (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={8}
                   className="text-center py-12 text-muted-foreground text-sm"
                 >
                   暂无作品

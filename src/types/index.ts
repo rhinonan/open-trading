@@ -161,6 +161,7 @@ export interface WorkWithBlogger {
   awemeId: string;
   desc: string;
   coverUrl: string;
+  shareUrl: string;
   mediaType: number;
   duration: number;
   statistics: string;
@@ -168,6 +169,7 @@ export interface WorkWithBlogger {
   transcriptStatus: TranscriptStatus;
   transcript: string | null;
   opinionSummary: string;
+  imageUrls: string;
   blogger: {
     id: number;
     slug: string;

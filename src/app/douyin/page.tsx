@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Radio, Settings } from "lucide-react";
+import { formatFollowerCount } from "@/lib/utils";
 import type { DouyinBloggerWithOpinion, SortDimension } from "@/types";
 
 const SORT_OPTIONS: { key: SortDimension; label: string }[] = [
@@ -125,7 +126,7 @@ export default function DouyinPage() {
                           {blogger.nickname}
                         </span>
                         <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                          {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
+                          {formatFollowerCount(blogger.followerCount ?? 0)} 粉丝
                         </span>
                         {blogger.accuracy !== null && (
                           <Badge variant="secondary" className="shrink-0 text-xs tabular-nums">

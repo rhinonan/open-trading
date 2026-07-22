@@ -91,6 +91,7 @@ export async function queryWorks(
       awemeId: works.awemeId,
       desc: works.desc,
       coverUrl: works.coverUrl,
+      shareUrl: works.shareUrl,
       mediaType: works.mediaType,
       duration: works.duration,
       statistics: works.statistics,
@@ -98,6 +99,7 @@ export async function queryWorks(
       transcriptStatus: works.transcriptStatus,
       transcript: works.transcript,
       opinionSummary: works.opinionSummary,
+      imageUrls: works.imageUrls,
       bloggerId: works.bloggerId,
       // blogger fields
       bloggerNickname: bloggers.nickname,
@@ -167,6 +169,7 @@ export async function queryWorks(
     awemeId: row.awemeId,
     desc: row.desc,
     coverUrl: row.coverUrl,
+    shareUrl: row.shareUrl ?? "",
     mediaType: row.mediaType,
     duration: row.duration,
     statistics: row.statistics,
@@ -174,6 +177,7 @@ export async function queryWorks(
     transcriptStatus: row.transcriptStatus,
     transcript: row.transcript,
     opinionSummary: row.opinionSummary ?? "",
+    imageUrls: row.imageUrls ?? "[]",
     blogger: {
       id: row.bloggerId,
       nickname: row.bloggerNickname,

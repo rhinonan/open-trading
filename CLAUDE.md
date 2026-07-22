@@ -13,9 +13,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm build` / `pnpm start` — 生产构建 / 启动（:3002，start 监听 0.0.0.0）
 - `pnpm lint` — ESLint
 - `pnpm test` — vitest 单测（内存 SQLite 上跑队列/runner 逻辑）
-- `pnpm db:generate` — 根据 `src/db/schema.ts` 生成迁移 SQL 到 `drizzle/`
-- `pnpm db:push` — 将 schema 直接推送到 `data/douyin.db`
+- `pnpm db:push` — **开发期改 schema 首选**：直接对比 schema.ts 与实库，自动 ALTER TABLE，无需手写迁移 SQL
+- `pnpm db:generate` — 功能稳定后生成迁移文件到 `drizzle/`（用于生产回滚与审查）
 - `pnpm db:studio` — Drizzle Studio
+
+### 数据库变更工作流（SQLite + Drizzle，无需 MongoDB）
+
+项目已在用 Drizzle ORM + SQLite，**功能频繁变更时不需要换数据库**。正确工作流：
+
+1. **开发迭代**：直接改 `src/db/schema.ts` → `pnpm db:push`（秒级完成，跳过迁移文件）
+2. **功能稳定后**：`pnpm db:generate` 自动从 schema diff 生成迁移 SQL，提交到 `drizzle/`
+3. **Docker 部署**：入口脚本自动执行 `drizzle-kit push --force`，无需手动迁移
+
+> `push` 对 SQLite 多数 ALTER 安全（增列/增表/增索引），但**重命名列/删列可能丢数据**——此类操作应走 `generate` + 手动编辑迁移 SQL。
 - `pnpm exec tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
 - Docker 部署：`docker compose up -d --build`（端口 **3002**，挂载 `./data`；入口脚本会 `drizzle-kit push --force`）。步骤见 [DEPLOY.md](./DEPLOY.md)
 

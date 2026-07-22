@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, X, Play, ImageIcon } from "lucide-react";
+import { formatFollowerCount } from "@/lib/utils";
 import type {
   DouyinBlogger,
   DouyinWork,
@@ -145,7 +146,7 @@ export default function BloggerDetailPage({
               </p>
               <div className="flex items-center gap-3 mt-2">
                 <span className="text-xs text-muted-foreground">
-                  {(blogger.followerCount ?? 0).toLocaleString()} 粉丝
+                  {formatFollowerCount(blogger.followerCount ?? 0)} 粉丝
                 </span>
                 {accuracy !== null && (
                   <Badge variant="secondary">

@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Search,
   Radio,
@@ -18,8 +18,10 @@ import {
   UserRound,
   Ban,
   Check,
+  MoreVertical,
 } from "lucide-react";
 import type { DouyinBlogger } from "@/types";
+import { formatFollowerCount } from "@/lib/utils";
 
 interface BloggerSidebarProps {
   bloggers: DouyinBlogger[];
@@ -50,8 +52,7 @@ export function BloggerSidebar({
   );
 
   return (
-    <TooltipProvider delay={0}>
-      <div className="w-60 shrink-0 border-r flex flex-col min-h-0">
+    <div className="w-60 shrink-0 border-r flex flex-col min-h-0">
         <div className="p-3">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -108,84 +109,70 @@ export function BloggerSidebar({
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {(b.followerCount ?? 0).toLocaleString()} 粉丝
+                      {formatFollowerCount(b.followerCount ?? 0)} 粉丝
                     </p>
                   </div>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Tooltip>
-                      <TooltipTrigger
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
                         render={
                           <button
                             type="button"
                             className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onScan(b);
-                            }}
+                            onClick={(e) => e.stopPropagation()}
                           />
                         }
                       >
-                        <Radio className="h-3 w-3" />
-                      </TooltipTrigger>
-                      <TooltipContent>扫描新作品</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onUpdateProfile(b);
-                            }}
-                          />
-                        }
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-32"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <UserRound className="h-3 w-3" />
-                      </TooltipTrigger>
-                      <TooltipContent>更新资料</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleDisabled(b);
-                            }}
-                          />
-                        }
-                      >
-                        {isDisabled ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <Ban className="h-3 w-3" />
-                        )}
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isDisabled ? "启用博主" : "停用博主"}
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(b);
-                            }}
-                          />
-                        }
-                      >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </TooltipTrigger>
-                      <TooltipContent>删除博主</TooltipContent>
-                    </Tooltip>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onScan(b);
+                          }}
+                        >
+                          <Radio className="h-3.5 w-3.5" />
+                          扫描作品
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateProfile(b);
+                          }}
+                        >
+                          <UserRound className="h-3.5 w-3.5" />
+                          更新资料
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleDisabled(b);
+                          }}
+                        >
+                          {isDisabled ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Ban className="h-3.5 w-3.5" />
+                          )}
+                          {isDisabled ? "启用博主" : "停用博主"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(b);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          删除博主
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               );
@@ -206,6 +193,5 @@ export function BloggerSidebar({
           </Button>
         </div>
       </div>
-    </TooltipProvider>
   );
 }

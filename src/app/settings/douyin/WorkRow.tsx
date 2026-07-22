@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { FileText, RefreshCw, Lightbulb, Scale } from "lucide-react";
+import { FileText, RefreshCw, Lightbulb, Scale, CheckCircle, CircleCheck, XCircle, Clock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { WorkWithBlogger } from "@/types";
 
@@ -99,22 +99,6 @@ export function WorkRow({
         />
       </td>
 
-      {/* 封面 */}
-      <td className="py-2 pl-2">
-        {work.coverUrl ? (
-          <img
-            src={work.coverUrl}
-            alt=""
-            className="h-10 w-10 rounded object-cover bg-muted"
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </div>
-        )}
-      </td>
-
       {/* 描述 */}
       <td className="py-2 max-w-[200px]">
         <p className="text-sm truncate" title={work.desc || undefined}>
@@ -169,23 +153,27 @@ export function WorkRow({
           work.judgment.notApplicable > 0) ? (
           <div className="flex items-center gap-1 text-xs">
             {work.judgment.correct > 0 && (
-              <span title="正确" className="text-success">
-                ✅{work.judgment.correct}
+              <span title="正确" className="inline-flex items-center gap-0.5 text-success">
+                <CheckCircle className="h-3.5 w-3.5" />
+                {work.judgment.correct}
               </span>
             )}
             {work.judgment.mostlyCorrect > 0 && (
-              <span title="基本正确" className="text-info">
-                💚{work.judgment.mostlyCorrect}
+              <span title="基本正确" className="inline-flex items-center gap-0.5 text-info">
+                <CircleCheck className="h-3.5 w-3.5" />
+                {work.judgment.mostlyCorrect}
               </span>
             )}
             {work.judgment.incorrect > 0 && (
-              <span title="不正确" className="text-danger">
-                ❌{work.judgment.incorrect}
+              <span title="不正确" className="inline-flex items-center gap-0.5 text-danger">
+                <XCircle className="h-3.5 w-3.5" />
+                {work.judgment.incorrect}
               </span>
             )}
             {work.judgment.notYet > 0 && (
-              <span title="待验证" className="text-warning">
-                ⏳{work.judgment.notYet}
+              <span title="待验证" className="inline-flex items-center gap-0.5 text-warning">
+                <Clock className="h-3.5 w-3.5" />
+                {work.judgment.notYet}
               </span>
             )}
           </div>

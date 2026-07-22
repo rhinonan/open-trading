@@ -1,6 +1,7 @@
 // src/mastra/workflows/transcribe-work-workflow.ts
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
+import * as fs from "fs";
 import { db } from "@/db";
 import { works } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -69,6 +70,13 @@ const extractAudioStep = createStep({
       awemeId,
     });
     const audioPath = await extractAudio(inputData.videoPath, awemeId);
+    // 音频提取完成，删除视频源文件以节省磁盘空间
+    try {
+      fs.unlinkSync(inputData.videoPath);
+      logger.info("video deleted after audio extraction", { videoPath: inputData.videoPath });
+    } catch (e) {
+      logger.warn("failed to delete video temp file", { videoPath: inputData.videoPath, error: String(e) });
+    }
     logger.info("extract-audio done", {
       workflowId: WORKFLOW_ID,
       workId,
@@ -108,6 +116,13 @@ const transcribeStep = createStep({
       durationMs: effectiveDuration,
     });
     const transcript = await transcribeAudio(inputData.audioPath, effectiveDuration);
+    // 转写完成，删除音频文件以节省磁盘空间
+    try {
+      fs.unlinkSync(inputData.audioPath);
+      logger.info("audio deleted after transcription", { audioPath: inputData.audioPath });
+    } catch (e) {
+      logger.warn("failed to delete audio temp file", { audioPath: inputData.audioPath, error: String(e) });
+    }
     logger.info("transcribe-audio done", {
       workflowId: WORKFLOW_ID,
       workId,
