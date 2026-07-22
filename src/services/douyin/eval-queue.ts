@@ -126,10 +126,10 @@ export function recoverStaleEval(
 }
 
 /** 将指定作品标记为评判失败 */
-export function markEvalFailed(workId: number, dbi: Db = db): void {
+export function markEvalFailed(workId: number, error?: string, dbi: Db = db): void {
   dbi
     .update(works)
-    .set({ evalStatus: "failed" })
+    .set({ evalStatus: "failed", lastError: error || null })
     .where(eq(works.id, workId))
     .run();
 }

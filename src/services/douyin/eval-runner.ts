@@ -15,11 +15,21 @@ import { llmLog, llmLogError, startTimer } from "@/lib/llm-log";
 const CONCURRENCY = 1; // 东财限流 + sandbox，串行唯一选择
 const WORKFLOW_ID = "evaluateWorkWorkflow";
 
+export interface RunnerStats {
+  processed: number;
+  succeeded: number;
+  failed: number;
+}
+
+function zeroStats(): RunnerStats {
+  return { processed: 0, succeeded: 0, failed: 0 };
+}
+
 /** 执行 Mastra evaluateWorkWorkflow；自身消化所有错误（失败回写 DB），不抛出 */
 async function runEvalWorkflow(
   work: ClaimedEvalWork,
   dbi: Db = db,
-): Promise<void> {
+): Promise<{ ok: boolean }> {
   const { id, awemeId } = work;
   const timer = startTimer();
   let runId: string | undefined;
@@ -60,7 +70,9 @@ async function runEvalWorkflow(
       latencyMs: timer.elapsedMs(),
       status: "success",
     });
+    return { ok: true };
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     llmLogError({
       event: "workflow.run.failed",
       workflowId: WORKFLOW_ID,
@@ -70,13 +82,16 @@ async function runEvalWorkflow(
       latencyMs: timer.elapsedMs(),
       error: err,
     });
-    markEvalFailed(id, dbi);
+    markEvalFailed(id, errorMsg, dbi);
+    return { ok: false };
   }
 }
 
 export interface Runner {
   kick(): void;
   isRunning(): boolean;
+  getStats(): RunnerStats;
+  awaitDrain(): Promise<RunnerStats>;
 }
 
 interface RunnerOptions {
@@ -89,9 +104,19 @@ export function createRunner(opts: RunnerOptions = {}): Runner {
   const concurrency = opts.concurrency ?? CONCURRENCY;
   let running = false;
   let wake = false;
+  let stats = zeroStats();
+  const drainResolvers: Array<(s: RunnerStats) => void> = [];
+
+  function resolveDrainers() {
+    const rs = drainResolvers.splice(0);
+    for (const r of rs) r({ ...stats });
+  }
 
   async function processWork(work: ClaimedEvalWork): Promise<void> {
-    await runEvalWorkflow(work, dbi);
+    const result = await runEvalWorkflow(work, dbi);
+    stats.processed++;
+    if (result && !result.ok) stats.failed++;
+    else stats.succeeded++;
   }
 
   async function worker(): Promise<void> {
@@ -128,13 +153,26 @@ export function createRunner(opts: RunnerOptions = {}): Runner {
       )
       .finally(() => {
         running = false;
-        if (wake) kick();
+        if (wake) {
+          kick();
+        } else {
+          resolveDrainers();
+        }
       });
+  }
+
+  function awaitDrain(): Promise<RunnerStats> {
+    if (!running && !wake) return Promise.resolve({ ...stats });
+    return new Promise((resolve) => {
+      drainResolvers.push(resolve);
+    });
   }
 
   return {
     kick,
     isRunning: () => running,
+    getStats: () => ({ ...stats }),
+    awaitDrain,
   };
 }
 

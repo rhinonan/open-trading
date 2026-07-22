@@ -18,14 +18,14 @@ export async function POST(req: NextRequest) {
     if (!JOB_DEFINITIONS.some((j) => j.id === id)) {
       return Response.json({ success: false, error: "未知 job" }, { status: 400 });
     }
-    const result = await getScheduler().runJob(id, { force: true });
+    const result = await getScheduler().runJob(id, { force: true, trigger: "manual" });
     if (result.busy) {
       return Response.json({ success: false, error: "任务正在运行", busy: true }, { status: 409 });
     }
     if (!result.ok) {
       return Response.json({ success: false, error: result.error }, { status: 500 });
     }
-    return Response.json({ success: true, summary: result.summary });
+    return Response.json({ success: true, summary: result.summary, runId: result.runId });
   } catch (err) {
     return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "运行失败" });
   }

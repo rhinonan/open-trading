@@ -16,13 +16,25 @@ const CONCURRENCY = 2;
 const TRANSCRIBE_WORKFLOW_ID = "transcribeWorkWorkflow" as const;
 const ANALYZE_IMAGE_WORKFLOW_ID = "analyzeImageWorkflow" as const;
 
+export interface RunnerStats {
+  processed: number;
+  succeeded: number;
+  failed: number;
+}
+
+function zeroStats(): RunnerStats {
+  return { processed: 0, succeeded: 0, failed: 0 };
+}
+
 export interface Runner {
   kick(): void;
   isRunning(): boolean;
+  getStats(): RunnerStats;
+  awaitDrain(): Promise<RunnerStats>;
 }
 
 interface RunnerOptions {
-  processWork: (work: ClaimedWork) => Promise<void>;
+  processWork: (work: ClaimedWork) => Promise<{ ok: boolean }>;
   dbi?: Db;
   concurrency?: number;
 }
@@ -33,15 +45,27 @@ export function createRunner(opts: RunnerOptions): Runner {
   const concurrency = opts.concurrency ?? CONCURRENCY;
   let running = false;
   let wake = false;
+  let stats = zeroStats();
+  const drainResolvers: Array<(s: RunnerStats) => void> = [];
+
+  function resolveDrainers() {
+    const rs = drainResolvers.splice(0);
+    for (const r of rs) r({ ...stats });
+  }
 
   async function worker(): Promise<void> {
     while (true) {
       const claimed = claimNextPending(dbi);
       if (!claimed) return;
       try {
-        await opts.processWork(claimed);
+        const result = await opts.processWork(claimed);
+        stats.processed++;
+        if (result && !result.ok) stats.failed++;
+        else stats.succeeded++;
       } catch (err) {
         // processWork 不应抛出；兜底防止单个任务击穿 worker
+        stats.processed++;
+        stats.failed++;
         llmLogError({
           event: "runner.work.unhandled",
           workflowId: TRANSCRIBE_WORKFLOW_ID,
@@ -49,7 +73,7 @@ export function createRunner(opts: RunnerOptions): Runner {
           awemeId: claimed.awemeId,
           error: err,
         });
-        markWorkFailed(claimed.id, dbi);
+        markWorkFailed(claimed.id, String(err), dbi);
       }
     }
   }
@@ -80,11 +104,22 @@ export function createRunner(opts: RunnerOptions): Runner {
       )
       .finally(() => {
         running = false;
-        if (wake) kick();
+        if (wake) {
+          kick();
+        } else {
+          resolveDrainers();
+        }
       });
   }
 
-  return { kick, isRunning: () => running };
+  function awaitDrain(): Promise<RunnerStats> {
+    if (!running && !wake) return Promise.resolve({ ...stats });
+    return new Promise((resolve) => {
+      drainResolvers.push(resolve);
+    });
+  }
+
+  return { kick, isRunning: () => running, getStats: () => ({ ...stats }), awaitDrain };
 }
 
 /** 非 success 的 workflow 运行结果 → 提取错误信息（两条分派路径共用） */
@@ -101,7 +136,7 @@ function workflowErrorMessage(result: {
 
 /** 真实任务执行：按 mediaType 分派——视频(4)走转写 workflow，图集(2)走图片分析 workflow；
  *  自身消化所有错误（失败回写 DB），不抛出 */
-async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
+async function runTranscribeWorkflow(work: ClaimedWork): Promise<{ ok: boolean }> {
   const { id, awemeId, videoUrl, duration, desc, mediaType, imageUrls } = work;
   const timer = startTimer();
   let runId: string | undefined;
@@ -170,7 +205,9 @@ async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
       // 未知媒体类型：显式失败，避免误路由或卡死在 processing
       throw new Error(`未知 mediaType: ${mediaType}`);
     }
+    return { ok: true };
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     llmLogError({
       event: "workflow.run.failed",
       workflowId,
@@ -180,7 +217,8 @@ async function runTranscribeWorkflow(work: ClaimedWork): Promise<void> {
       latencyMs: timer.elapsedMs(),
       error: err,
     });
-    markWorkFailed(id);
+    markWorkFailed(id, errorMsg);
+    return { ok: false };
   }
 }
 

@@ -1,7 +1,10 @@
 // src/services/scheduler/job-scheduler.ts
-// 可注入的 JobScheduler 内核：tick / force run / busy 互斥 / settings 持久化
+// 可注入的 JobScheduler 内核：tick / force run / busy 互斥 / settings 持久化 + job_runs 历史
 import { parseCron, cronMatches } from "@/lib/cron-matcher";
 import type { JobDefinition, RunJobResult, ScheduleJobId } from "./types";
+import { eq } from "drizzle-orm";
+import { type Db, db as defaultDb } from "@/db";
+import { jobRuns } from "@/db/schema";
 
 export type { JobDefinition, RunJobResult, ScheduleJobId };
 
@@ -17,11 +20,12 @@ export function createJobScheduler(opts: {
   setSetting: (key: string, value: string) => Promise<void>;
   now?: () => number; // unix sec，测试注入
   tickIntervalMs?: number;
+  dbi?: Db; // 生产注入 db 以写 job_runs；测试不传则跳过
 }): {
   start(): void;
   stop(): void;
   tick(): Promise<void>;
-  runJob(id: ScheduleJobId, opts?: { force?: boolean }): Promise<RunJobResult>;
+  runJob(id: ScheduleJobId, runOpts?: { force?: boolean; trigger?: "manual" | "cron" }): Promise<RunJobResult>;
   isRunning(id: ScheduleJobId): boolean;
 } {
   const {
@@ -30,6 +34,7 @@ export function createJobScheduler(opts: {
     setSetting,
     now: nowFn = () => Math.floor(Date.now() / 1000),
     tickIntervalMs = DEFAULT_TICK_INTERVAL_MS,
+    dbi = defaultDb,
   } = opts;
 
   const byId = new Map(jobs.map((j) => [j.id, j]));
@@ -74,7 +79,7 @@ export function createJobScheduler(opts: {
 
   async function runJob(
     id: ScheduleJobId,
-    runOpts?: { force?: boolean },
+    runOpts?: { force?: boolean; trigger?: "manual" | "cron" },
   ): Promise<RunJobResult> {
     const job = byId.get(id);
     if (!job) {
@@ -99,7 +104,25 @@ export function createJobScheduler(opts: {
     }
 
     running.add(id);
+    const trigger = runOpts?.trigger ?? "cron";
     const now = nowFn();
+
+    // 写入 job_runs 开始记录
+    let runId: number | undefined;
+    if (dbi) {
+      try {
+        const row = await dbi.insert(jobRuns).values({
+          jobId: id,
+          trigger,
+          startedAt: now,
+          status: "running",
+        }).returning({ id: jobRuns.id }).get();
+        runId = row?.id;
+      } catch {
+        // 写 run 记录失败不影响任务执行
+      }
+    }
+
     try {
       const result = await job.handler();
       const summary =
@@ -108,12 +131,32 @@ export function createJobScheduler(opts: {
           : undefined;
       await setSetting(settingKey(id, "last_run_at"), String(now));
       await setSetting(settingKey(id, "last_error"), "");
-      return { ok: true, summary };
+      // 更新 job_runs 为成功
+      if (runId != null && dbi) {
+        try {
+          await dbi.update(jobRuns).set({
+            finishedAt: nowFn(),
+            status: "success",
+            summary: summary ?? "",
+          }).where(eq(jobRuns.id, runId)).run();
+        } catch { /* 忽略 */ }
+      }
+      return { ok: true, summary, runId };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await setSetting(settingKey(id, "last_run_at"), String(now));
       await setSetting(settingKey(id, "last_error"), message);
-      return { ok: false, error: message };
+      // 更新 job_runs 为失败
+      if (runId != null && dbi) {
+        try {
+          await dbi.update(jobRuns).set({
+            finishedAt: nowFn(),
+            status: "failed",
+            error: message,
+          }).where(eq(jobRuns.id, runId)).run();
+        } catch { /* 忽略 */ }
+      }
+      return { ok: false, error: message, runId };
     } finally {
       running.delete(id);
     }
@@ -127,9 +170,7 @@ export function createJobScheduler(opts: {
       const lastRunStr = await getSetting(settingKey(job.id, "last_run_at"));
       const lastRunAt = lastRunStr ? parseInt(lastRunStr, 10) : 0;
       if (!(await shouldFire(job, lastRunAt, now))) continue;
-      // 非 force runJob 内部会再校验；直接调 handler 路径也可，这里用 force 避免双重 shouldFire 竞态
-      // 但 brief 写「enabled 且 shouldFire 则 runJob（非 force）」——用非 force 即可
-      await runJob(job.id);
+      await runJob(job.id, { trigger: "cron" });
     }
   }
 

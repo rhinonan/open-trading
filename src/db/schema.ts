@@ -55,6 +55,7 @@ export const works = sqliteTable(
     imageUrls: text("image_urls").notNull().default("[]"),
     evalClaimedAt: integer("eval_claimed_at"),
     evaluatedAt: integer("evaluated_at"),
+    lastError: text("last_error").default(""),
   },
   (t) => [
     index("works_blogger_id_idx").on(t.bloggerId),
@@ -85,6 +86,24 @@ export const predictionItems = sqliteTable("prediction_items", {
     sql`judgment = 'not_yet'`
   ),
 ]);
+
+export const jobRuns = sqliteTable(
+  "job_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobId: text("job_id").notNull(),
+    trigger: text("trigger").notNull().default("manual"),
+    startedAt: integer("started_at").notNull(),
+    finishedAt: integer("finished_at"),
+    status: text("status").notNull().default("running"),
+    summary: text("summary").default(""),
+    error: text("error").default(""),
+  },
+  (t) => [
+    index("job_runs_job_id_idx").on(t.jobId),
+    index("job_runs_started_at_idx").on(t.startedAt),
+  ],
+);
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),

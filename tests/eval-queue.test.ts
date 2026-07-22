@@ -168,7 +168,7 @@ describe("markEvalFailed", () => {
   it("将 processing 置为 failed", () => {
     const b = seedBlogger();
     const w = seedWork(b, { evalStatus: "processing" });
-    markEvalFailed(w, dbi);
+    markEvalFailed(w, undefined, dbi);
     expect(getWork(w).evalStatus).toBe("failed");
   });
 });

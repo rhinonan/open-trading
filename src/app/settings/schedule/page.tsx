@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Play, Save, Clock } from "lucide-react";
+import { Loader2, Play, Save, Clock, ExternalLink, Mic, Search, User, TrendingUp } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -23,6 +23,13 @@ interface ScheduleJob {
   lastError: string | null;
   nextRun: string;
 }
+
+const JOB_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  profile: User,
+  scan: Search,
+  pipeline: Mic,
+  eval: TrendingUp,
+};
 
 const PRESETS: Record<string, Array<{ label: string; cron: string }>> = {
   profile: [
@@ -227,7 +234,13 @@ export default function ScheduleSettingsPage() {
             return (
               <Card key={job.id}>
                 <CardHeader className="border-b">
-                  <CardTitle>{job.label}</CardTitle>
+                  <CardTitle className="flex items-center gap-1.5">
+                    {(() => {
+                      const Icon = JOB_ICONS[job.id];
+                      return Icon ? <Icon className="h-4 w-4" /> : null;
+                    })()}
+                    {job.label}
+                  </CardTitle>
                   <CardDescription>{job.description}</CardDescription>
                   <CardAction>
                     <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
@@ -337,6 +350,16 @@ export default function ScheduleSettingsPage() {
                       上次错误：{job.lastError}
                     </p>
                   ) : null}
+
+                  <div className="border-t pt-3">
+                    <a
+                      href="/settings/schedule/history"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      查看完整运行历史
+                    </a>
+                  </div>
                 </CardContent>
               </Card>
             );

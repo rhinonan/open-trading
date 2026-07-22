@@ -17,4 +17,5 @@ export interface RunJobResult {
   busy?: boolean;
   error?: string;
   summary?: string;
+  runId?: number;
 }

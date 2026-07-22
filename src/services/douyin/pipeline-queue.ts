@@ -131,10 +131,10 @@ export function countByStatus(
   return row?.count ?? 0;
 }
 
-export function markWorkFailed(workId: number, dbi: Db = db): void {
+export function markWorkFailed(workId: number, error?: string, dbi: Db = db): void {
   dbi
     .update(works)
-    .set({ transcriptStatus: "failed" })
+    .set({ transcriptStatus: "failed", lastError: error || null })
     .where(eq(works.id, workId))
     .run();
 }

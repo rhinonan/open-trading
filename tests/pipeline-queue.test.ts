@@ -174,7 +174,7 @@ describe("countByStatus / markWorkFailed", () => {
   it("markWorkFailed 置 failed", () => {
     const b = seedBlogger();
     const w = seedWork(b, { transcriptStatus: "processing" });
-    markWorkFailed(w, dbi);
+    markWorkFailed(w, undefined, dbi);
     expect(getWork(w).transcriptStatus).toBe("failed");
   });
 });

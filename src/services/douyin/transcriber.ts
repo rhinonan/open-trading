@@ -1,8 +1,11 @@
 // src/services/douyin/transcriber.ts
 // 阿里云百炼 Paraformer-v2 ASR 适配器
-// 流程：上传音频 → 文件服务 → 提交百炼任务 → 轮询 → 下载识别结果 → 清理远端文件
+// 流程：压缩音频 → 上传文件服务 → 提交百炼任务 → 轮询 → 下载识别结果 → 清理远端文件
 import * as fs from "fs";
 import * as path from "path";
+import { spawn } from "child_process";
+import * as crypto from "crypto";
+import { dataPath, ensureDataRoot } from "@/lib/data-root";
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY || "";
 const PUBLIC_BASE_URL = (
@@ -50,6 +53,73 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
     h["Authorization"] = `Bearer ${ADMIN_TOKEN}`;
   }
   return h;
+}
+
+// ============================================================
+// 音频压缩（WAV → MP3，避免大文件触发 nginx 413）
+// ============================================================
+
+const TMP_DIR = dataPath("tmp");
+
+function ensureTmpDir() {
+  ensureDataRoot();
+  if (!fs.existsSync(TMP_DIR)) {
+    fs.mkdirSync(TMP_DIR, { recursive: true });
+  }
+}
+
+function findFfmpeg(): string {
+  return process.env.FFMPEG_PATH || "ffmpeg";
+}
+
+/**
+ * 将 WAV 转为 MP3（64kbps mono），返回压缩后文件路径。
+ * 163s WAV ≈ 5.2MB → MP3 ≈ 1.3MB，可过 nginx 1MB 限制的...
+ * 不够，32kbps 才 ~650KB。用 32kbps 语音够用。
+ */
+async function compressAudio(wavPath: string): Promise<string> {
+  ensureTmpDir();
+  const id = crypto.randomUUID();
+  const outPath = path.join(TMP_DIR, `${id}.mp3`);
+
+  const ffmpegBin = findFfmpeg();
+  const wavSizeKB = (fs.statSync(wavPath).size / 1024).toFixed(0);
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpegBin, [
+      "-y",
+      "-i", wavPath,
+      "-vn",
+      "-acodec", "libmp3lame",
+      "-b:a", "32k",
+      "-ar", "16000",
+      "-ac", "1",
+      outPath,
+    ]);
+
+    let stderr = "";
+    proc.stderr.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        const mp3SizeKB = (fs.statSync(outPath).size / 1024).toFixed(0);
+        console.log(
+          `  [asr] 音频压缩完成 ${wavSizeKB}KB → ${mp3SizeKB}KB`,
+        );
+        resolve(outPath);
+      } else {
+        const lines = stderr.trim().split("\n");
+        const lastLine = lines[lines.length - 1] || stderr.trim();
+        reject(new Error(`ffmpeg compress exit ${code}: ${lastLine}`));
+      }
+    });
+
+    proc.on("error", (err) => {
+      reject(new Error(`ffmpeg compress spawn failed: ${err.message}`));
+    });
+  });
 }
 
 // ============================================================
@@ -252,29 +322,40 @@ export async function transcribeAudio(
     `  [asr] 开始转写 duration=${durationSec.toFixed(0)}s file=${path.basename(audioPath)}`,
   );
 
-  // ---- 1. 上传音频到文件服务 → 获取公网 URL ----
-  const { id: fileId, url: fileUrl } =
-    await uploadToFileService(audioPath);
+  // ---- 1. 压缩 WAV → MP3（避免大文件触发 nginx 413） ----
+  const compressedPath = await compressAudio(audioPath);
 
-  let taskId: string | undefined;
   try {
-    // ---- 2. 提交百炼 ASR 任务 ----
-    taskId = await submitTask(fileUrl);
+    // ---- 2. 上传压缩后的音频到文件服务 → 获取公网 URL ----
+    const { id: fileId, url: fileUrl } =
+      await uploadToFileService(compressedPath);
 
-    // ---- 3. 轮询任务直到完成（最长等 8 分钟） ----
-    const transcriptionUrl = await pollTask(taskId, 8 * 60_000);
+    try {
+      // ---- 3. 提交百炼 ASR 任务 ----
+      const taskId = await submitTask(fileUrl);
 
-    // ---- 4. 下载并解析识别结果 ----
-    const transcript = await fetchTranscript(transcriptionUrl);
+      // ---- 4. 轮询任务直到完成（最长等 8 分钟） ----
+      const transcriptionUrl = await pollTask(taskId, 8 * 60_000);
 
-    const chars = transcript.length;
-    console.log(
-      `  [asr] 转写完成 → ${chars} 字符 (${durationSec.toFixed(0)}s 音频)`,
-    );
-    return transcript;
+      // ---- 5. 下载并解析识别结果 ----
+      const transcript = await fetchTranscript(transcriptionUrl);
+
+      const chars = transcript.length;
+      console.log(
+        `  [asr] 转写完成 → ${chars} 字符 (${durationSec.toFixed(0)}s 音频)`,
+      );
+      return transcript;
+    } finally {
+      // ---- 清理远端文件（无论成败） ----
+      await deleteFromFileService(fileId);
+    }
   } finally {
-    // ---- 5. 清理远端文件（无论成败） ----
-    await deleteFromFileService(fileId);
+    // ---- 清理本地压缩临时文件 ----
+    try {
+      fs.unlinkSync(compressedPath);
+    } catch {
+      // 忽略清理错误
+    }
   }
 }
 

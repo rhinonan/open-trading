@@ -4,14 +4,19 @@ import { listEnabledBloggers, updateBloggerProfile } from "@/services/douyin/blo
 export async function runProfileJob(): Promise<{ summary: string }> {
   const list = await listEnabledBloggers();
   let ok = 0;
-  let fail = 0;
+  const failures: string[] = [];
   for (const b of list) {
     try {
       await updateBloggerProfile(b.slug);
       ok++;
-    } catch {
-      fail++;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      failures.push(`${b.nickname}: ${reason}`);
     }
   }
-  return { summary: `资料更新 ${ok} 成功 / ${fail} 失败` };
+  const parts = [`${ok} 成功`];
+  if (failures.length > 0) {
+    parts.push(`${failures.length} 失败`);
+  }
+  return { summary: `资料更新 ${parts.join(" / ")}` };
 }

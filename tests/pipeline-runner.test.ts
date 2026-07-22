@@ -67,6 +67,7 @@ describe("createRunner", () => {
         processed.push(w.id);
         markDone(dbi, w.id);
         active--;
+        return { ok: true };
       },
     });
 
@@ -91,6 +92,7 @@ describe("createRunner", () => {
       processWork: async (w: ClaimedWork) => {
         if (w.id === bad) throw new Error("boom");
         markDone(dbi, w.id);
+        return { ok: true };
       },
     });
 
@@ -116,6 +118,7 @@ describe("createRunner", () => {
         processed.push(w.id);
         await new Promise((r) => setTimeout(r, 5));
         markDone(dbi, w.id);
+        return { ok: true };
       },
     });
 
@@ -133,7 +136,7 @@ describe("createRunner", () => {
     const runner = createRunner({
       dbi,
       concurrency: 1,
-      processWork: async (w: ClaimedWork) => markDone(dbi, w.id),
+      processWork: async (w: ClaimedWork) => { markDone(dbi, w.id); return { ok: true }; },
     });
 
     runner.kick();
@@ -161,6 +164,7 @@ describe("createRunner", () => {
           });
         }
         markDone(dbi, w.id);
+        return { ok: true };
       },
     });
 
@@ -187,7 +191,7 @@ describe("createRunner", () => {
     const runner = createRunner({
       dbi,
       concurrency: 1,
-      processWork: async (w: ClaimedWork) => markDone(dbi, w.id),
+      processWork: async (w: ClaimedWork) => { markDone(dbi, w.id); return { ok: true }; },
     });
     runner.kick();
     await waitIdle(runner);

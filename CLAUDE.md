@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > `push` 对 SQLite 多数 ALTER 安全（增列/增表/增索引），但**重命名列/删列可能丢数据**——此类操作应走 `generate` + 手动编辑迁移 SQL。
 - `pnpm exec tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
-- Docker 部署：`docker compose up -d --build`（端口 **3002**，挂载 `./data`；入口脚本会 `drizzle-kit push --force`）。步骤见 [DEPLOY.md](./DEPLOY.md)
+- Docker 部署：`docker compose down && docker compose up -d --build`（端口 **3002**，挂载 `./data`；入口脚本会 `drizzle-kit push --force`）。步骤见 [DEPLOY.md](./DEPLOY.md)。**注意：含 schema 变更时必须 `down` 再 `up`**，否则旧容器可能因新增列/表而导致 drizzle-kit push 失败。
 
 Node >= 22.13.0。新环境推荐：`corepack enable` → `pnpm install` → `pnpm setup` → 编辑 `.env` 填密钥（TikHub、newapi、百炼 ASR）→ `pnpm dev`。  
 运行时 `ensureDataRoot()` 会自动创建数据目录；空库表结构仍需 `setup` / `db:push` 写入。
