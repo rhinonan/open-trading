@@ -95,15 +95,14 @@ const transcribeStep = createStep({
   retries: 2,
   execute: async ({ inputData, getInitData, mastra }) => {
     const { workId, awemeId, duration } = getInitData<WorkflowInput>();
-    // duration=0 表示未知 — 按长音频（LFASR）兜底
+    // duration=0 表示未知 — 兜底传 61s，百炼接口统一处理
     const effectiveDuration = duration > 0 ? duration : 61_000;
-    const method = effectiveDuration / 1000 <= 60 ? "IAT" : "LFASR";
     const logger = mastra.getLogger();
     logger.info("transcribe-audio start", {
       workflowId: WORKFLOW_ID,
       workId,
       awemeId,
-      method,
+      method: "bailian-paraformer-v2",
       durationMs: effectiveDuration,
     });
     llmLog("info", {
@@ -112,7 +111,7 @@ const transcribeStep = createStep({
       stepId: "transcribe-audio",
       workId,
       awemeId,
-      method,
+      method: "bailian-paraformer-v2",
       durationMs: effectiveDuration,
     });
     const transcript = await transcribeAudio(inputData.audioPath, effectiveDuration);
