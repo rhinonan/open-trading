@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { FileText, RefreshCw, Lightbulb, Scale, CheckCircle, CircleCheck, XCircle, Clock, Mic } from "lucide-react";
+import { FileText, FileAudio, Lightbulb, Scale, CheckCircle, CircleCheck, XCircle, Clock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { WorkWithBlogger } from "@/types";
 
@@ -209,7 +209,7 @@ export function WorkRow({
               {loading.transcribe ? (
                 <Spinner className="h-3.5 w-3.5" />
               ) : (
-                <Mic className="h-3.5 w-3.5" />
+                <FileAudio className="h-3.5 w-3.5" />
               )}
             </TooltipTrigger>
             <TooltipContent>
