@@ -138,7 +138,7 @@ async function uploadToFileService(
     headers: authHeaders({
       "Content-Type": `multipart/form-data; boundary=${boundary}`,
     }),
-    body,
+    body: new Uint8Array(body),
   });
 
   if (!res.ok) {
