@@ -5,8 +5,26 @@ name: Build and push Docker image
 on:
   push:
     branches: [main]
+    # 仅业务/镜像相关路径变更才构建；改 CLAUDE.md、docs 等不打镜像。
+    # 注意：paths 不对 tag 推送生效，打 v* tag 仍会构建。
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".dockerignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "src/**"
+      - "public/**"
+      - "scripts/docker-entrypoint.mjs"
+      - "drizzle/**"
+      - "drizzle.config.ts"
+      - "next.config.ts"
+      - "tsconfig.json"
+      - "postcss.config.*"
+      - "components.json"
+      - ".github/workflows/docker-publish.yml"
     tags: ["v*"]
-  workflow_dispatch:
+  workflow_dispatch: # 强制发版：Actions 页手动 Run
 
 env:
   REGISTRY: ghcr.io

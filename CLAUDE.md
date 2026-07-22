@@ -27,7 +27,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > `push` 对 SQLite 多数 ALTER 安全（增列/增表/增索引），但**重命名列/删列可能丢数据**——此类操作应走 `generate` + 手动编辑迁移 SQL。
 - `pnpm exec tsx scripts/<name>.ts` — 运行一次性维护/调试脚本（cleanup、reset-works、migrate-slug 等）
-- Docker 部署：`docker compose down && docker compose up -d --build`（端口 **3002**，挂载 `./data`；入口脚本会 `drizzle-kit push --force`）。步骤见 [DEPLOY.md](./DEPLOY.md)。**注意：含 schema 变更时必须 `down` 再 `up`**，否则旧容器可能因新增列/表而导致 drizzle-kit push 失败。
+
+### Docker 部署（CI 构建 + 服务器只 pull）
+
+**不要在弱服务器上 `docker compose up --build`。** 镜像由 GitHub Actions 构建并推到 GHCR；服务器只拉取运行。完整步骤见 [DEPLOY.md](./DEPLOY.md)。
+
+| 角色 | 做什么 |
+|------|--------|
+| 开发机 | 日常 `pnpm dev`；发版 `git push origin main`（或打 `v*` tag） |
+| CI | `.github/workflows/docker-publish.yml`：`main`（**仅** Dockerfile/依赖/`src/**` 等路径变更）/ `v*` tag / 手动 Run → 构建 `linux/amd64` → 推 GHCR；改文档 alone 不构建 |
+| 服务器 | `docker compose pull && docker compose up -d`（**无** `build:`） |
+
+- 镜像：`ghcr.io/rhinonan/open-trading:latest`（另有 commit sha / git tag）
+- Compose：`docker-compose.yml` 使用 `image:` + `pull_policy: always`，挂载 `./data` → `/app/data`，端口 **3002**
+- 入口脚本仍会 `drizzle-kit push --force` 同步 schema
+- **私有 Package**：服务器一次性 `docker login ghcr.io -u rhinonan`（PAT 需 `read:packages`）
+- **含 schema 变更时**建议 `docker compose down && docker compose up -d`（先 pull 到新镜像）
+- 应急本机构建：见 DEPLOY.md「可选：本机构建」；正常路径不需要
+
+服务器更新清单：
+
+```bash
+# 开发机 push 后等 Actions 变绿，再在服务器：
+docker compose pull
+docker compose up -d
+# schema 变更更稳妥：
+# docker compose down && docker compose pull && docker compose up -d
+```
 
 Node >= 22.13.0。新环境推荐：`corepack enable` → `pnpm install` → `pnpm setup` → 编辑 `.env` 填密钥（TikHub、newapi、百炼 ASR）→ `pnpm dev`。  
 运行时 `ensureDataRoot()` 会自动创建数据目录；空库表结构仍需 `setup` / `db:push` 写入。
