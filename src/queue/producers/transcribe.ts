@@ -52,7 +52,7 @@ export async function enqueueTranscribeWork(
     await getTranscribeQueue().add(
       "transcribe",
       { workId },
-      { jobId: `transcribe:${workId}` },
+      { jobId: `transcribe-${workId}` },
     );
   } catch (err) {
     // jobId 已存在（仍在队列/完成未清理）时：用新 jobId 再试
@@ -61,7 +61,7 @@ export async function enqueueTranscribeWork(
       await getTranscribeQueue().add(
         "transcribe",
         { workId },
-        { jobId: `transcribe:${workId}:${Date.now()}` },
+        { jobId: `transcribe-${workId}-${Date.now()}` },
       );
     } else {
       throw err;
@@ -112,7 +112,7 @@ export async function enqueuePendingTranscribes(opts?: {
       rows.map((r) => ({
         name: "transcribe",
         data: { workId: r.id },
-        opts: { jobId: `transcribe:${r.id}` },
+        opts: { jobId: `transcribe-${r.id}` },
       })),
     );
   }

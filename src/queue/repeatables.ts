@@ -39,7 +39,7 @@ export async function syncScheduleRepeatables(): Promise<void> {
       { scheduleJobId: def.id },
       {
         repeat: { pattern: cron },
-        jobId: `repeat:${def.id}`,
+        jobId: `repeat-${def.id}`,
       },
     );
   }
@@ -61,6 +61,6 @@ export async function enqueueScheduleManual(
   await getQueue(queueName).add(
     id,
     { scheduleJobId: id, trigger: "manual" },
-    { jobId: `manual:${id}:${Date.now()}` },
+    { jobId: `manual-${id}-${Date.now()}` },
   );
 }

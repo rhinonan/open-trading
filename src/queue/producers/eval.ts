@@ -23,7 +23,7 @@ export async function enqueueEvalJobs(
     unique.map((workId) => ({
       name: "eval",
       data: { workId },
-      opts: { jobId: `eval:${workId}` },
+      opts: { jobId: `eval-${workId}` },
     })),
   );
   return unique.length;
