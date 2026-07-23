@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SUB_TABS = [
   { label: "调度配置", href: "/settings/schedule" },
   { label: "运行历史", href: "/settings/schedule/history" },
-];
+] as const;
 
 export default function ScheduleLayout({
   children,
@@ -15,28 +15,31 @@ export default function ScheduleLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const active =
+    pathname === "/settings/schedule/history"
+      ? "/settings/schedule/history"
+      : "/settings/schedule";
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-1 border-b">
-        {SUB_TABS.map((tab) => {
-          const active = pathname === tab.href;
-          return (
-            <Link
+      <Tabs value={active}>
+        <TabsList
+          variant="line"
+          className="w-full justify-start rounded-none border-b bg-transparent p-0"
+        >
+          {SUB_TABS.map((tab) => (
+            <TabsTrigger
               key={tab.href}
-              href={tab.href}
-              className={cn(
-                "px-4 py-2 text-sm -mb-px border-b-2 transition-colors",
-                active
-                  ? "border-primary text-foreground font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
+              value={tab.href}
+              nativeButton={false}
+              render={<Link href={tab.href} />}
+              className="rounded-none"
             >
               {tab.label}
-            </Link>
-          );
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {children}
     </div>
   );

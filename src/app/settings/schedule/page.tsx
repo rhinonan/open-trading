@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Play, Save, Clock, ExternalLink, Mic, Search, User, TrendingUp } from "lucide-react";
+import { Play, Save, Clock, ExternalLink, Mic, Search, User, TrendingUp } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Spinner } from "@/components/ui/spinner";
 
 interface ScheduleJob {
   id: string;
@@ -219,7 +222,7 @@ export default function ScheduleSettingsPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> 加载中...
+          <Spinner className="h-4 w-4" /> 加载中...
         </p>
       ) : jobs.length === 0 ? (
         <p className="text-sm text-muted-foreground">暂无调度任务</p>
@@ -243,18 +246,20 @@ export default function ScheduleSettingsPage() {
                   </CardTitle>
                   <CardDescription>{job.description}</CardDescription>
                   <CardAction>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                      <span className="text-muted-foreground">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Label
+                        htmlFor={`job-enabled-${job.id}`}
+                        className="text-muted-foreground cursor-pointer"
+                      >
                         {job.enabled ? "已启用" : "已关闭"}
-                      </span>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-primary"
+                      </Label>
+                      <Switch
+                        id={`job-enabled-${job.id}`}
                         checked={job.enabled}
                         disabled={busy}
-                        onChange={() => handleToggle(job)}
+                        onCheckedChange={() => handleToggle(job)}
                       />
-                    </label>
+                    </div>
                   </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
@@ -287,7 +292,7 @@ export default function ScheduleSettingsPage() {
                         onClick={() => void handleSaveCron(job)}
                       >
                         {savingId === job.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Spinner className="h-3.5 w-3.5" />
                         ) : (
                           <Save className="h-3.5 w-3.5" />
                         )}
@@ -300,7 +305,7 @@ export default function ScheduleSettingsPage() {
                         onClick={() => void handleRun(job)}
                       >
                         {runningId === job.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Spinner className="h-3.5 w-3.5" />
                         ) : (
                           <Play className="h-3.5 w-3.5" />
                         )}

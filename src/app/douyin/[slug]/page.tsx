@@ -2,9 +2,15 @@
 
 import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, X, Play, ImageIcon } from "lucide-react";
 import { formatFollowerCount } from "@/lib/utils";
 import type {
@@ -130,15 +136,17 @@ export default function BloggerDetailPage({
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
-            {blogger.avatarUrl ? (
-              <img
-                src={blogger.avatarUrl}
-                alt={blogger.nickname}
-                className="h-14 w-14 rounded-full object-cover"
-              />
-            ) : (
-              <div className="h-14 w-14 rounded-full bg-muted" />
-            )}
+            <Avatar size="lg" className="size-14">
+              {blogger.avatarUrl ? (
+                <AvatarImage
+                  src={blogger.avatarUrl}
+                  alt={blogger.nickname}
+                />
+              ) : null}
+              <AvatarFallback>
+                {blogger.nickname.slice(0, 1)}
+              </AvatarFallback>
+            </Avatar>
             <div>
               <h1 className="text-xl font-bold">{blogger.nickname}</h1>
               <p className="text-sm text-muted-foreground">
@@ -160,31 +168,19 @@ export default function BloggerDetailPage({
       </Card>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        <button
-          onClick={() => {
-            setTab("works");
-            loadWorks();
-          }}
-          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-            tab === "works"
-              ? "bg-accent text-accent-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          作品列表
-        </button>
-        <button
-          onClick={() => setTab("summary")}
-          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-            tab === "summary"
-              ? "bg-accent text-accent-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          评判汇总
-        </button>
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const next = v === "summary" ? "summary" : "works";
+          setTab(next);
+          if (next === "works") loadWorks();
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="works">作品列表</TabsTrigger>
+          <TabsTrigger value="summary">评判汇总</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Works Tab */}
       {tab === "works" && (

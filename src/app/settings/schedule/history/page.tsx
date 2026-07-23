@@ -1,8 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, History, Mic, Search, User, TrendingUp } from "lucide-react";
+import { RefreshCw, History, Mic, Search, User, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 interface JobRun {
   id: number;
@@ -29,7 +46,13 @@ const JOB_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   eval: TrendingUp,
 };
 
-const JOB_IDS = ["", "profile", "scan", "pipeline", "eval"] as const;
+const JOB_FILTER_OPTIONS = [
+  { value: "all", label: "全部任务" },
+  { value: "profile", label: "资料更新" },
+  { value: "scan", label: "作品扫描" },
+  { value: "pipeline", label: "处理队列" },
+  { value: "eval", label: "观点评判" },
+] as const;
 
 function formatTime(ts: number): string {
   return new Date(ts * 1000).toLocaleString("zh-CN", {
@@ -53,13 +76,13 @@ function formatDuration(start: number, end: number | null): string {
 export default function HistoryPage() {
   const [runs, setRuns] = useState<JobRun[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>("");
+  const [filter, setFilter] = useState<string>("all");
 
   const fetchRuns = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "50" });
-      if (filter) params.set("jobId", filter);
+      if (filter && filter !== "all") params.set("jobId", filter);
       const res = await fetch(`/api/settings/schedules/runs?${params}`);
       const data = await res.json();
       if (data.success) setRuns(data.runs ?? []);
@@ -78,18 +101,18 @@ export default function HistoryPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <select
-            className="border rounded px-2 py-1.5 text-sm bg-background"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="">全部任务</option>
-            {JOB_IDS.filter(Boolean).map((id) => (
-              <option key={id} value={id}>
-                {JOB_LABELS[id]}
-              </option>
-            ))}
-          </select>
+          <Select value={filter} onValueChange={(v) => setFilter(v ?? "all")}>
+            <SelectTrigger size="sm" className="min-w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {JOB_FILTER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="outline"
@@ -110,7 +133,7 @@ export default function HistoryPage() {
 
       {loading && runs.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Spinner className="h-4 w-4" />
           加载中...
         </div>
       ) : runs.length === 0 ? (
@@ -118,72 +141,61 @@ export default function HistoryPage() {
           <History className="h-8 w-8 opacity-40" />
           <p>暂无运行记录</p>
           <p className="text-xs">
-            前往「调度配置」点击"立即运行"触发一次任务
+            前往「调度配置」点击&quot;立即运行&quot;触发一次任务
           </p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-36">
-                  时间
-                </th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-20">
-                  任务
-                </th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-16">
-                  触发
-                </th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-16">
-                  状态
-                </th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">
-                  结果
-                </th>
-                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground w-16">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead className="w-36 text-muted-foreground">时间</TableHead>
+                <TableHead className="w-20 text-muted-foreground">任务</TableHead>
+                <TableHead className="w-16 text-muted-foreground">触发</TableHead>
+                <TableHead className="w-16 text-muted-foreground">状态</TableHead>
+                <TableHead className="text-muted-foreground">结果</TableHead>
+                <TableHead className="w-16 text-right text-muted-foreground">
                   耗时
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {runs.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-b last:border-b-0 hover:bg-muted/30 transition-colors"
-                >
-                  <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
+                <TableRow key={r.id}>
+                  <TableCell className="font-mono text-xs">
                     {formatTime(r.startedAt)}
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
+                  </TableCell>
+                  <TableCell>
                     <span className="inline-flex items-center gap-1">
                       {(() => {
                         const Icon = JOB_ICONS[r.jobId];
-                        return Icon ? <Icon className="h-3.5 w-3.5 text-muted-foreground" /> : null;
+                        return Icon ? (
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                        ) : null;
                       })()}
                       {JOB_LABELS[r.jobId] ?? r.jobId}
                     </span>
-                  </td>
-                  <td className="px-4 py-2 text-muted-foreground text-xs whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
                     {r.trigger === "manual" ? "手动" : "定时"}
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
+                  </TableCell>
+                  <TableCell>
                     {r.status === "success" ? (
-                      <span className="text-green-600 text-xs font-medium">
+                      <Badge variant="success" className="text-xs">
                         成功
-                      </span>
+                      </Badge>
                     ) : r.status === "failed" ? (
-                      <span className="text-destructive text-xs font-medium">
+                      <Badge variant="destructive" className="text-xs">
                         失败
-                      </span>
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs inline-flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Spinner className="h-3 w-3" />
                         运行中
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-2 min-w-0">
+                  </TableCell>
+                  <TableCell className="min-w-0 whitespace-normal">
                     <span
                       className={
                         r.status === "failed"
@@ -195,14 +207,14 @@ export default function HistoryPage() {
                         ? r.error || r.summary || "—"
                         : r.summary || "—"}
                     </span>
-                  </td>
-                  <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
                     {formatDuration(r.startedAt, r.finishedAt)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

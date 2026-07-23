@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -440,27 +442,30 @@ function InstallSkillDialogBody({
             </p>
             <div className="max-h-48 space-y-2 overflow-auto">
               {(batch?.candidates ?? []).map((c) => (
-                <label
+                <div
                   key={c.name}
                   className="flex items-start gap-2 rounded-md border p-2 text-sm"
                 >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 accent-primary"
+                  <Checkbox
+                    id={`skill-cand-${c.name}`}
+                    className="mt-0.5"
                     checked={selected.has(c.name)}
                     disabled={busy}
-                    onChange={() => toggleCandidate(c.name)}
+                    onCheckedChange={() => toggleCandidate(c.name)}
                   />
-                  <span>
+                  <Label
+                    htmlFor={`skill-cand-${c.name}`}
+                    className="font-normal cursor-pointer items-start"
+                  >
                     <span className="font-medium">{c.name}</span>
                     <span className="ml-2 text-xs text-muted-foreground">
                       v{c.version}
                     </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                    <span className="mt-0.5 block text-xs text-muted-foreground font-normal">
                       {c.description}
                     </span>
-                  </span>
-                </label>
+                  </Label>
+                </div>
               ))}
             </div>
             {mode === "update" && (

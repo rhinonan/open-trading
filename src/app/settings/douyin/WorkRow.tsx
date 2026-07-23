@@ -2,7 +2,9 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { FileText, FileAudio, Lightbulb, Scale, CheckCircle, CircleCheck, XCircle, Clock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -88,43 +90,42 @@ export function WorkRow({
   const opinionText = work.opinionSummary || "";
 
   return (
-    <tr className="border-b hover:bg-muted/30 transition-colors">
+    <TableRow>
       {/* 选择 */}
-      <td className="py-2 pl-2">
-        <input
-          type="checkbox"
+      <TableCell className="pl-2">
+        <Checkbox
           checked={selected}
-          onChange={onToggleSelect}
+          onCheckedChange={onToggleSelect}
           aria-label="选择作品"
         />
-      </td>
+      </TableCell>
 
       {/* 描述 */}
-      <td className="py-2 max-w-[200px]">
+      <TableCell className="max-w-[200px] whitespace-normal">
         <p className="text-sm truncate" title={work.desc || undefined}>
           {work.desc || "(无文案)"}
         </p>
-      </td>
+      </TableCell>
 
       {/* 类型 */}
-      <td className="py-2">
+      <TableCell>
         <Badge variant={isVideo ? "info" : "secondary"}>
           {isVideo ? "视频" : "图集"}
         </Badge>
-      </td>
+      </TableCell>
 
       {/* 时长 */}
-      <td className="py-2 text-sm text-muted-foreground whitespace-nowrap">
+      <TableCell className="text-sm text-muted-foreground">
         {isVideo ? formatDuration(work.duration) : "-"}
-      </td>
+      </TableCell>
 
       {/* 转写状态 */}
-      <td className="py-2">
+      <TableCell>
         <Badge variant={tStatus.variant}>{tStatus.label}</Badge>
-      </td>
+      </TableCell>
 
       {/* 观点 */}
-      <td className="py-2">
+      <TableCell className="whitespace-normal">
         {opinionText ? (
           <HoverCard>
             <HoverCardTrigger
@@ -143,10 +144,10 @@ export function WorkRow({
         ) : (
           <span className="text-sm text-muted-foreground">-</span>
         )}
-      </td>
+      </TableCell>
 
       {/* 评判状态 */}
-      <td className="py-2">
+      <TableCell className="whitespace-normal">
         {work.judgment &&
         (work.judgment.evaluable > 0 ||
           work.judgment.notYet > 0 ||
@@ -180,10 +181,10 @@ export function WorkRow({
         ) : (
           <Badge variant={eStatus.variant}>{eStatus.label}</Badge>
         )}
-      </td>
+      </TableCell>
 
       {/* 操作 */}
-      <td className="py-2 pr-4">
+      <TableCell className="pr-4">
         <div className="flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger
@@ -267,7 +268,7 @@ export function WorkRow({
             </TooltipContent>
           </Tooltip>
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }

@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { WorkRow } from "./WorkRow";
 import type { WorkWithBlogger, WorksResponse } from "@/types";
 
@@ -225,37 +233,37 @@ export function WorksTable({
         </div>
       )}
 
+      {/* 不用 Table 根组件（会包一层 overflow-x-auto），以免 sticky 表头失效 */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b text-xs text-muted-foreground sticky top-0 bg-background z-10">
-              <th className="w-8 pl-2">
-                <input
-                  type="checkbox"
+        <table data-slot="table" className="w-full caption-bottom text-sm">
+          <TableHeader>
+            <TableRow className="text-xs text-muted-foreground sticky top-0 bg-background z-10 hover:bg-background">
+              <TableHead className="w-8 pl-2">
+                <Checkbox
                   checked={allPageSelected}
-                  onChange={togglePage}
+                  onCheckedChange={togglePage}
                   aria-label="全选本页"
                 />
-              </th>
-              <th className="text-left font-medium py-2 pl-2">描述</th>
-              <th className="text-left font-medium py-2 w-16">类型</th>
-              <th className="text-left font-medium py-2 w-16">时长</th>
-              <th className="text-left font-medium py-2 w-20">转写</th>
-              <th className="text-left font-medium py-2 w-32">观点</th>
-              <th className="text-left font-medium py-2 w-28">评判</th>
-              <th className="text-left font-medium py-2 pr-4 w-36">操作</th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+              <TableHead className="pl-2">描述</TableHead>
+              <TableHead className="w-16">类型</TableHead>
+              <TableHead className="w-16">时长</TableHead>
+              <TableHead className="w-20">转写</TableHead>
+              <TableHead className="w-32">观点</TableHead>
+              <TableHead className="w-28">评判</TableHead>
+              <TableHead className="pr-4 w-36">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading && !data ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>
+                <TableRow key={i}>
                   {Array.from({ length: 8 }).map((_, j) => (
-                    <td key={j} className="py-2 px-2">
+                    <TableCell key={j}>
                       <Skeleton className="h-8 w-full" />
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))
             ) : data && data.works.length > 0 ? (
               data.works.map((w) => (
@@ -276,16 +284,16 @@ export function WorksTable({
                 />
               ))
             ) : (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={8}
-                  className="text-center py-12 text-muted-foreground text-sm"
+                  className="text-center py-12 text-muted-foreground whitespace-normal"
                 >
                   暂无作品
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
+          </TableBody>
         </table>
       </div>
 

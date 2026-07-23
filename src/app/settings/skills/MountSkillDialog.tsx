@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -78,13 +81,12 @@ function MountSkillDialogBody({
             <p className="text-sm text-muted-foreground">暂无 Agent 挂载配置</p>
           ) : (
             agentKeys.map((ak) => (
-              <label key={ak} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-primary"
+              <div key={ak} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  id={`mount-${ak}`}
                   checked={selected.has(ak)}
                   disabled={busy}
-                  onChange={() => {
+                  onCheckedChange={() => {
                     setSelected((prev) => {
                       const n = new Set(prev);
                       if (n.has(ak)) n.delete(ak);
@@ -93,12 +95,18 @@ function MountSkillDialogBody({
                     });
                   }}
                 />
-                {ak}
-              </label>
+                <Label htmlFor={`mount-${ak}`} className="font-normal cursor-pointer">
+                  {ak}
+                </Label>
+              </div>
             ))
           )}
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         <DialogFooter>
           <Button
             variant="outline"

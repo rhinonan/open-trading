@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -60,7 +62,7 @@ export function AddBloggerDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <input
+          <Input
             type="text"
             value={uidInput}
             onChange={(e) => {
@@ -69,11 +71,12 @@ export function AddBloggerDialog({
             }}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="输入抖音博主 sec_uid..."
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             autoFocus
           />
           {error && (
-            <p className="text-sm text-danger">{error}</p>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
         </div>
 
@@ -84,7 +87,7 @@ export function AddBloggerDialog({
           <Button onClick={handleAdd} disabled={adding || !uidInput.trim()}>
             {adding ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Spinner className="h-4 w-4" />
                 添加中...
               </>
             ) : (

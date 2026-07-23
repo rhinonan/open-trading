@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TABS = [
   { label: "基础设置", href: "/settings" },
@@ -10,28 +10,40 @@ const TABS = [
   { label: "调度", href: "/settings/schedule" },
   { label: "队列", href: "/settings/queues" },
   { label: "Skills", href: "/settings/skills" },
-];
+] as const;
+
+function matchTab(pathname: string): string {
+  // 更长路径优先，避免 /settings 抢占子路由
+  const sorted = [...TABS].sort((a, b) => b.href.length - a.href.length);
+  for (const tab of sorted) {
+    if (tab.href === "/settings") {
+      if (pathname === "/settings") return tab.href;
+    } else if (pathname === tab.href || pathname.startsWith(tab.href + "/")) {
+      return tab.href;
+    }
+  }
+  return "/settings";
+}
 
 export function SettingsTabs() {
   const pathname = usePathname();
+  const active = matchTab(pathname);
 
   return (
-    <div className="flex gap-1 border-b">
-      {TABS.map((tab) => (
-        <Link
-          key={tab.href}
-          href={tab.href}
-          className={cn(
-            "px-4 py-2 text-sm -mb-px border-b-2 transition-colors",
-            pathname === tab.href ||
-            (tab.href !== "/settings" && pathname.startsWith(tab.href))
-              ? "border-primary text-foreground font-medium"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {tab.label}
-        </Link>
-      ))}
-    </div>
+    <Tabs value={active}>
+      <TabsList variant="line" className="w-full justify-start rounded-none border-b bg-transparent p-0">
+        {TABS.map((tab) => (
+          <TabsTrigger
+            key={tab.href}
+            value={tab.href}
+            nativeButton={false}
+            render={<Link href={tab.href} />}
+            className="rounded-none"
+          >
+            {tab.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }

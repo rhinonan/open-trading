@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { Settings, Sun, Moon, Monitor, Cpu, Loader2 } from "lucide-react";
+import { Settings, Sun, Moon, Monitor, Cpu } from "lucide-react";
 import { DEFAULT_LLM_MODEL } from "@/lib/llm-constants";
 
 interface LlmSettings {
@@ -124,7 +133,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           {llmLoading ? (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> 加载中...
+              <Spinner className="h-4 w-4" /> 加载中...
             </p>
           ) : (
             <>
@@ -139,28 +148,41 @@ export default function SettingsPage() {
                       {llmSettings?.[field] ?? DEFAULT_LLM_MODEL}
                     </span>
                   ) : (
-                    <select
-                      value={llmSettings?.[field] ?? ""}
+                    <Select
+                      value={llmSettings[field]}
                       disabled={saving}
-                      onChange={(e) => handleModelChange(field, e.target.value)}
-                      className="max-w-[280px] rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      onValueChange={(v) => {
+                        if (v) void handleModelChange(field, v);
+                      }}
                     >
-                      {/* 已保存模型不在列表中时也要可见 */}
-                      {llmSettings && !models.includes(llmSettings[field]) && (
-                        <option value={llmSettings[field]}>{llmSettings[field]}</option>
-                      )}
-                      {models.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="max-w-[280px] w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {!models.includes(llmSettings[field]) && (
+                          <SelectItem value={llmSettings[field]}>
+                            {llmSettings[field]}
+                          </SelectItem>
+                        )}
+                        {models.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
               ))}
               {llmError && (
-                <p className="text-sm text-danger bg-muted/50 rounded-md p-3">{llmError}</p>
+                <Alert variant="destructive">
+                  <AlertDescription>{llmError}</AlertDescription>
+                </Alert>
               )}
               {llmMessage && (
-                <p className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">{llmMessage}</p>
+                <Alert>
+                  <AlertDescription>{llmMessage}</AlertDescription>
+                </Alert>
               )}
             </>
           )}

@@ -5,6 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -88,17 +93,14 @@ export function BloggerSidebar({
                     selectedSlug === b.slug ? "bg-accent" : "hover:bg-muted/50"
                   }`}
                 >
-                  {b.avatarUrl ? (
-                    <img
-                      src={b.avatarUrl}
-                      alt=""
-                      className="h-7 w-7 rounded-full object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      <Radio className="h-3.5 w-3.5 text-muted-foreground" />
-                    </div>
-                  )}
+                  <Avatar size="sm" className="shrink-0">
+                    {b.avatarUrl ? (
+                      <AvatarImage src={b.avatarUrl} alt="" />
+                    ) : null}
+                    <AvatarFallback>
+                      <Radio className="h-3.5 w-3.5" />
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       {b.nickname}

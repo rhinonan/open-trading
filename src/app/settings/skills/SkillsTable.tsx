@@ -2,6 +2,15 @@
 
 import { RefreshCw, Trash2, Cable } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import type { SkillRow } from "./types";
 
 // lucide-react 已移除品牌图标，与 header 一致内联 GitHub mark
@@ -36,29 +45,34 @@ export function SkillsTable({
 
   return (
     <div className="overflow-auto rounded-lg border">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b text-xs text-muted-foreground bg-background">
-            <th className="text-left font-medium py-2 pl-4">名称</th>
-            <th className="text-left font-medium py-2 w-20">版本</th>
-            <th className="text-left font-medium py-2">描述</th>
-            <th className="text-left font-medium py-2 w-28">协议</th>
-            <th className="text-left font-medium py-2 w-12">源</th>
-            <th className="text-left font-medium py-2 w-24">commit</th>
-            <th className="text-left font-medium py-2 w-16">启用</th>
-            <th className="text-left font-medium py-2 pr-4 w-40">操作</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table>
+        <TableHeader>
+          <TableRow className="text-xs text-muted-foreground bg-background hover:bg-background">
+            <TableHead className="pl-4">名称</TableHead>
+            <TableHead className="w-20">版本</TableHead>
+            <TableHead>描述</TableHead>
+            <TableHead className="w-28">协议</TableHead>
+            <TableHead className="w-12">源</TableHead>
+            <TableHead className="w-24">commit</TableHead>
+            <TableHead className="w-16">启用</TableHead>
+            <TableHead className="pr-4 w-40">操作</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {skills.map((s) => (
-            <tr key={s.name} className="border-b last:border-0 text-sm">
-              <td className="py-2 pl-4 font-medium">{s.name}</td>
-              <td className="py-2 text-muted-foreground">v{s.version}</td>
-              <td className="py-2 max-w-xs truncate text-muted-foreground" title={s.description}>
+            <TableRow key={s.name}>
+              <TableCell className="pl-4 font-medium">{s.name}</TableCell>
+              <TableCell className="text-muted-foreground">v{s.version}</TableCell>
+              <TableCell
+                className="max-w-xs truncate text-muted-foreground"
+                title={s.description}
+              >
                 {s.description}
-              </td>
-              <td className="py-2 text-muted-foreground">{s.license ?? "—"}</td>
-              <td className="py-2">
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {s.license ?? "—"}
+              </TableCell>
+              <TableCell>
                 {s.sourceUrl ? (
                   <a
                     href={s.sourceUrl}
@@ -72,25 +86,37 @@ export function SkillsTable({
                 ) : (
                   "—"
                 )}
-              </td>
-              <td className="py-2 font-mono text-xs text-muted-foreground" title={s.commit ?? undefined}>
+              </TableCell>
+              <TableCell
+                className="font-mono text-xs text-muted-foreground"
+                title={s.commit ?? undefined}
+              >
                 {s.commitShort ?? "—"}
-              </td>
-              <td className="py-2">
-                <input
-                  type="checkbox"
+              </TableCell>
+              <TableCell>
+                <Switch
+                  size="sm"
                   checked={s.enabled}
-                  onChange={() => onToggle(s.name, s.enabled)}
-                  className="h-3.5 w-3.5 accent-primary"
+                  onCheckedChange={() => onToggle(s.name, s.enabled)}
                   title={s.enabled ? "点击禁用" : "点击启用"}
                 />
-              </td>
-              <td className="py-2 pr-4">
+              </TableCell>
+              <TableCell className="pr-4">
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon-sm" onClick={() => onUpdate(s)} title="更新">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => onUpdate(s)}
+                    title="更新"
+                  >
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon-sm" onClick={() => onMount(s)} title="挂载">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => onMount(s)}
+                    title="挂载"
+                  >
                     <Cable className="h-3.5 w-3.5" />
                   </Button>
                   <Button
@@ -103,11 +129,11 @@ export function SkillsTable({
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
