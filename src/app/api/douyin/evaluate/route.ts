@@ -1,5 +1,4 @@
-import { enqueueForEvaluation } from "@/services/douyin/eval-queue";
-import { getEvalRunner } from "@/services/douyin/eval-runner";
+import { enqueueEvalFromDb } from "@/queue/producers/eval";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ensureSchedulerStarted } from "@/services/scheduler";
 import { jsonError } from "@/lib/api-error";
@@ -11,9 +10,8 @@ export async function POST(request: Request) {
   ensureSchedulerStarted();
 
   try {
-    const count = enqueueForEvaluation();
-    getEvalRunner().kick();
-    return Response.json({ success: true, enqueued: count });
+    const { marked, jobs } = await enqueueEvalFromDb();
+    return Response.json({ success: true, enqueued: marked, jobs });
   } catch (err) {
     return jsonError(err, { request: request, status: 500, body: "success-false", fallback: "入队失败" });
   }

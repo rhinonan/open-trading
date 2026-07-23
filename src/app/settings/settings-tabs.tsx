@@ -8,6 +8,7 @@ const TABS = [
   { label: "基础设置", href: "/settings" },
   { label: "抖音雷达", href: "/settings/douyin" },
   { label: "调度", href: "/settings/schedule" },
+  { label: "队列", href: "/settings/queues" },
   { label: "Skills", href: "/settings/skills" },
 ];
 
@@ -22,7 +23,8 @@ export function SettingsTabs() {
           href={tab.href}
           className={cn(
             "px-4 py-2 text-sm -mb-px border-b-2 transition-colors",
-            pathname === tab.href
+            pathname === tab.href ||
+            (tab.href !== "/settings" && pathname.startsWith(tab.href))
               ? "border-primary text-foreground font-medium"
               : "border-transparent text-muted-foreground hover:text-foreground",
           )}

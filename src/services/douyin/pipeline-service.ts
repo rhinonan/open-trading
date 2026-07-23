@@ -1,56 +1,55 @@
 // src/services/douyin/pipeline-service.ts
-// 转写任务的入队 API：路由只调这里，立即返回；实际执行由 pipeline-runner 后台消费。
-// 旧版在此同步跑整条管线（信号量 + 等待全部完成），已废弃。
+// 转写任务入队 API：路由只调这里，立即返回；由 BullMQ Worker 消费。
 import {
-  enqueueWork,
-  recoverStaleProcessing,
-  resetFailedForBlogger,
-  countByStatus,
-} from "@/services/douyin/pipeline-queue";
-import { getTranscribeRunner } from "@/services/douyin/pipeline-runner";
-import { ensureSchedulerStarted } from "@/services/scheduler";
+  enqueuePendingTranscribes,
+  enqueueTranscribeWork,
+} from "@/queue/producers/transcribe";
+import { ensureQueueRuntime } from "@/queue/bootstrap";
+import { recoverStaleProcessing } from "@/services/douyin/pipeline-queue";
 
 export interface EnqueueResult {
   accepted: true;
-  /** 排队中（含刚被僵尸恢复重置的） */
   pending: number;
-  /** 正在转写 */
   processing: number;
+  queued?: number;
 }
 
-/** 全局转写：恢复僵尸 + 唤醒 runner 清空整个 pending 队列 */
-export function startTranscribePendingWorks(): EnqueueResult {
-  ensureSchedulerStarted();
+/** 全局转写：恢复僵尸 + bulk 入 Bull */
+export async function startTranscribePendingWorks(): Promise<EnqueueResult> {
+  ensureQueueRuntime();
   recoverStaleProcessing();
-  getTranscribeRunner().kick();
+  const r = await enqueuePendingTranscribes();
   return {
     accepted: true,
-    pending: countByStatus("pending"),
-    processing: countByStatus("processing"),
+    pending: r.pending,
+    processing: r.processing,
+    queued: r.queued,
   };
 }
 
-/** 单博主转写：该博主的 failed 重置为 pending（重试语义）后唤醒 */
-export function startTranscribeBloggerWorks(bloggerId: number): EnqueueResult {
-  ensureSchedulerStarted();
+/** 单博主转写：failed 重置后 bulk 入队 */
+export async function startTranscribeBloggerWorks(
+  bloggerId: number,
+): Promise<EnqueueResult> {
+  ensureQueueRuntime();
   recoverStaleProcessing();
-  resetFailedForBlogger(bloggerId);
-  getTranscribeRunner().kick();
+  const r = await enqueuePendingTranscribes({
+    bloggerId,
+    resetFailed: true,
+  });
   return {
     accepted: true,
-    pending: countByStatus("pending", bloggerId),
-    processing: countByStatus("processing", bloggerId),
+    pending: r.pending,
+    processing: r.processing,
+    queued: r.queued,
   };
 }
 
-/** 单作品转写：入队后唤醒 */
-export function startTranscribeWork(workId: number): {
+/** 单作品转写 */
+export async function startTranscribeWork(workId: number): Promise<{
   success: boolean;
   error?: string;
-} {
-  ensureSchedulerStarted();
-  const r = enqueueWork(workId);
-  if (!r.queued) return { success: false, error: r.reason };
-  getTranscribeRunner().kick();
-  return { success: true };
+}> {
+  ensureQueueRuntime();
+  return enqueueTranscribeWork(workId);
 }

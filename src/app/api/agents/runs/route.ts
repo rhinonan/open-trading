@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
   const perPage = Math.min(Math.max(1, Number(searchParams.get("perPage")) || 10), 50);
 
   try {
-    const workflow = mastra.getWorkflow("transcribeWorkWorkflow");
+    // 转写已迁出 Mastra；运行历史以评判 workflow 为主（AI 侧）
+    const workflow = mastra.getWorkflow("evaluateWorkWorkflow");
     const { runs, total } = await workflow.listWorkflowRuns({ page, perPage });
 
     const mapped: RunSummary[] = runs.map((run) => {

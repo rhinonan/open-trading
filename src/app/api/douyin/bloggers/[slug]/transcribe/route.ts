@@ -8,14 +8,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   const denied = requireAdmin(req);
   if (denied) return denied;
 
-
   const { slug } = await ctx.params;
   try {
     const blogger = await bloggerService.getBloggerBySlug(slug);
     if (!blogger) {
       return Response.json({ success: false, error: "博主不存在" }, { status: 404 });
     }
-    const result = startTranscribeBloggerWorks(blogger.id);
+    const result = await startTranscribeBloggerWorks(blogger.id);
     return Response.json({ success: true, ...result });
   } catch (err) {
     return jsonError(err, { request: req, status: 500, body: "success-false", fallback: "转写失败" });

@@ -78,6 +78,13 @@
       "when": 1784708283682,
       "tag": "0010_smart_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1784800000000,
+      "tag": "0011_pipeline_progress",
+      "breakpoints": true
     }
   ]
 }

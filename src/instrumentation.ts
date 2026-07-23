@@ -1,9 +1,11 @@
 // src/instrumentation.ts
-// Next.js 服务端 instrumentation：未在 route 内 catch 的错误也会落到这里。
-// 已用 jsonError 处理的 500 不会再进 onRequestError（异常未抛出）。
+// Next.js 服务端 instrumentation：启动 BullMQ runtime；未 catch 错误落 onRequestError。
 
 export async function register() {
-  // 预留：可在此挂 OTel / 其它全局初始化
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { ensureQueueRuntime } = await import("@/queue/bootstrap");
+    ensureQueueRuntime();
+  }
 }
 
 export async function onRequestError(

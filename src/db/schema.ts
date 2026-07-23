@@ -56,6 +56,12 @@ export const works = sqliteTable(
     evalClaimedAt: integer("eval_claimed_at"),
     evaluatedAt: integer("evaluated_at"),
     lastError: text("last_error").default(""),
+    /** 管线细进度 stage（queued / download_video / asr_poll …） */
+    pipelineStage: text("pipeline_stage").notNull().default(""),
+    /** 0–100 */
+    pipelineProgress: integer("pipeline_progress").notNull().default(0),
+    /** 中文展示文案，冗余便于前端直接显示 */
+    pipelineStageLabel: text("pipeline_stage_label").notNull().default(""),
   },
   (t) => [
     index("works_blogger_id_idx").on(t.bloggerId),

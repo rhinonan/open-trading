@@ -76,7 +76,7 @@ Node >= 22.13.0。新环境推荐：`corepack enable` → `pnpm install` → `pn
 ### 抖音雷达管线
 
 1. **扫描**：`scanner-service` 经 `src/lib/douyin-api.ts` 调 TikHub API 拉取博主作品。`DOUYIN_CACHE_MODE=true` 时响应落盘缓存到 `data/api-cache/`（节省 API 配额）。
-2. **转写**：works 表即任务队列（`transcriptStatus` + `claimedAt`）。`pipeline-queue.ts` 提供原子认领（`UPDATE ... WHERE status='pending'`）与僵尸恢复（processing 超 15 分钟重置）；`pipeline-runner.ts` 是进程内 globalThis 单例（固定并发 2），`kick()` 唤醒后清空队列自动歇下。每条作品跑一次 Mastra `transcribeWorkWorkflow`：下载视频 → ffmpeg 提取音频 → 百炼 Paraformer-v2 ASR（音频上传内建文件服务 → 提交公网 URL → 轮询获取结果）→ LLM 观点提取并回写业务库，每步自动重试 2 次。transcribe 路由只入队 + kick，立即返回，前端轮询进度。**此机制依赖单实例部署**，横向扩容前须改造。
+2. **转写**：由 **BullMQ**（`src/queue/*`，Redis）调度；`works.transcriptStatus` + `pipelineStage`/`pipelineProgress` 为业务状态与细进度。Worker 同进程编排 I/O（下载/ffmpeg/上传/ASR）并写进度，**Mastra 仅做观点等 AI**（`extractOpinion*`）。评判类似（`douyin-eval` 队列）。定时任务为 BullMQ repeatable（settings cron）。**依赖 Redis + 单实例 open-trading**（SQLite）。
 3. **评估**：`evaluator-service` + `market-snapshot` 将博主预测与行情对照打分，结果写入 evaluations / prediction_items。
 
 API 有全局与单博主两套入口：`/api/douyin/{scan,transcribe,evaluate}` 与 `/api/douyin/bloggers/[slug]/{scan,transcribe,summarize,evaluate,update-profile}`。

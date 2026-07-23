@@ -9,6 +9,7 @@ import {
   JOB_DEFINITIONS,
   type ScheduleJobId,
 } from "@/services/scheduler";
+import { syncScheduleRepeatables } from "@/queue/repeatables";
 
 const IDS = new Set(JOB_DEFINITIONS.map((j) => j.id));
 
@@ -69,6 +70,11 @@ export async function PUT(req: NextRequest) {
       await setSetting(`schedule.${id}.enabled`, body.enabled ? "true" : "false");
     }
     const def = JOB_DEFINITIONS.find((j) => j.id === id)!;
+    try {
+      await syncScheduleRepeatables();
+    } catch (e) {
+      console.error("syncScheduleRepeatables failed", e);
+    }
     const job = await readJob(def);
     return Response.json({ success: true, job });
   } catch (err) {

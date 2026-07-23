@@ -77,7 +77,7 @@ function findFfmpeg(): string {
  * 163s WAV ≈ 5.2MB → MP3 ≈ 1.3MB，可过 nginx 1MB 限制的...
  * 不够，32kbps 才 ~650KB。用 32kbps 语音够用。
  */
-async function compressAudio(wavPath: string): Promise<string> {
+export async function compressAudio(wavPath: string): Promise<string> {
   ensureTmpDir();
   const id = crypto.randomUUID();
   const outPath = path.join(TMP_DIR, `${id}.mp3`);
@@ -126,7 +126,7 @@ async function compressAudio(wavPath: string): Promise<string> {
 // 文件服务操作
 // ============================================================
 
-async function uploadToFileService(
+export async function uploadToFileService(
   audioPath: string,
 ): Promise<{ id: string; url: string }> {
   const fileBuffer = fs.readFileSync(audioPath);
@@ -155,7 +155,7 @@ async function uploadToFileService(
   return json;
 }
 
-async function deleteFromFileService(id: string): Promise<void> {
+export async function deleteFromFileService(id: string): Promise<void> {
   try {
     const res = await fetch(`${PUBLIC_BASE_URL}/api/files/${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -175,7 +175,7 @@ async function deleteFromFileService(id: string): Promise<void> {
 // 百炼 Paraformer-v2 API
 // ============================================================
 
-async function submitTask(fileUrl: string): Promise<string> {
+export async function submitAsrTask(fileUrl: string): Promise<string> {
   const res = await fetch(
     `https://${WORKSPACE_HOST}/api/v1/services/audio/asr/transcription`,
     {
@@ -213,13 +213,24 @@ async function submitTask(fileUrl: string): Promise<string> {
   return taskId;
 }
 
-async function pollTask(taskId: string, timeoutMs: number): Promise<string> {
+/**
+ * 轮询百炼任务。onTick 可选：elapsedMs/timeoutMs，用于写 pipeline 进度。
+ */
+export async function pollAsrTask(
+  taskId: string,
+  timeoutMs: number,
+  onTick?: (info: { elapsedMs: number; timeoutMs: number; attempt: number }) => void | Promise<void>,
+): Promise<string> {
   const start = Date.now();
   let attempt = 0;
 
   while (Date.now() - start < timeoutMs) {
     await sleep(2_000);
     attempt++;
+    const elapsedMs = Date.now() - start;
+    if (onTick) {
+      await onTick({ elapsedMs, timeoutMs, attempt });
+    }
 
     const res = await fetch(
       `https://${WORKSPACE_HOST}/api/v1/tasks/${taskId}`,
@@ -275,7 +286,7 @@ async function pollTask(taskId: string, timeoutMs: number): Promise<string> {
   );
 }
 
-async function fetchTranscript(transcriptionUrl: string): Promise<string> {
+export async function fetchAsrTranscript(transcriptionUrl: string): Promise<string> {
   const res = await fetch(transcriptionUrl);
   if (!res.ok) {
     throw new Error(
@@ -332,13 +343,13 @@ export async function transcribeAudio(
 
     try {
       // ---- 3. 提交百炼 ASR 任务 ----
-      const taskId = await submitTask(fileUrl);
+      const taskId = await submitAsrTask(fileUrl);
 
       // ---- 4. 轮询任务直到完成（最长等 8 分钟） ----
-      const transcriptionUrl = await pollTask(taskId, 8 * 60_000);
+      const transcriptionUrl = await pollAsrTask(taskId, 8 * 60_000);
 
       // ---- 5. 下载并解析识别结果 ----
-      const transcript = await fetchTranscript(transcriptionUrl);
+      const transcript = await fetchAsrTranscript(transcriptionUrl);
 
       const chars = transcript.length;
       console.log(

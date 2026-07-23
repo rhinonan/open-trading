@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
     "@mastra/libsql",
     "@mastra/loggers",
     "@mastra/observability",
+    "bullmq",
+    "ioredis",
+    "express",
+    "@bull-board/api",
+    "@bull-board/ui",
+    "@bull-board/express",
   ],
 };
 
